@@ -180,22 +180,25 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [authMode, setAuthMode] = useState('login');
-  const [form, setForm] = useState({ email: '', password: '', displayName: '' });
+  const [form, setForm] = useState({ email: '', password: '', displayName: '', inviteCode: '' });
   const [summary, setSummary] = useState(null);
   const [pages, setPages] = useState({
     ledgers: emptyPage,
     orders: emptyPage,
+    withdraws: emptyPage,
     tasks: emptyPage,
     assets: { ...emptyPage, pageSize: 12 }
   });
   const [filters, setFilters] = useState({
     ledgers: { page: 1, pageSize: 10, q: '', direction: 'all' },
     orders: { page: 1, pageSize: 10, q: '', status: 'all' },
+    withdraws: { page: 1, pageSize: 10, status: 'all' },
     tasks: { page: 1, pageSize: 10, q: '', status: 'all' },
     assets: { page: 1, pageSize: 12, q: '', assetType: 'all' }
   });
   const [profileForm, setProfileForm] = useState({ email: '', displayName: '', billingPreference: 'balance_first', locale: 'zh-CN' });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' });
+  const [invite, setInvite] = useState(null);
   const [state, setState] = useState({
     components: [],
     models: [],
@@ -252,7 +255,7 @@ function App() {
     if (!token) return;
     setLoading(true);
     try {
-      const [me, components, models, workflows, workshop, wallet, userSummary, ledgersPage, ordersPage, tasksPage, assetsPage] = await Promise.all([
+      const [me, components, models, workflows, workshop, wallet, userSummary, inviteInfo, ledgersPage, ordersPage, withdrawsPage, tasksPage, assetsPage] = await Promise.all([
         api('/api/users/me'),
         api('/api/components'),
         api('/api/models/capabilities'),
@@ -260,13 +263,16 @@ function App() {
         api('/api/workshop/items'),
         api('/api/wallet/balance'),
         api('/api/users/me/summary'),
+        api('/api/users/me/invite'),
         api(`/api/wallet/ledgers?${queryFrom(filters.ledgers)}`),
         api(`/api/payments/recharge-orders?${queryFrom(filters.orders)}`),
+        api(`/api/withdraw-orders?${queryFrom(filters.withdraws)}`),
         api(`/api/tasks?${queryFrom(filters.tasks)}`),
         api(`/api/assets?${queryFrom(filters.assets)}`)
       ]);
       setUser(me);
       setSummary(userSummary);
+      setInvite(inviteInfo);
       setProfileForm({
         email: me.email || '',
         displayName: me.displayName || '',
@@ -276,6 +282,7 @@ function App() {
       const normalizedPages = {
         ledgers: normalizePage(ledgersPage, filters.ledgers.pageSize),
         orders: normalizePage(ordersPage, filters.orders.pageSize),
+        withdraws: normalizePage(withdrawsPage, filters.withdraws.pageSize),
         tasks: normalizePage(tasksPage, filters.tasks.pageSize),
         assets: normalizePage(assetsPage, filters.assets.pageSize)
       };
@@ -343,7 +350,7 @@ function App() {
     try {
       const path = authMode === 'register' ? '/api/auth/register' : '/api/auth/login';
       const payload = authMode === 'register'
-        ? { email: form.email, password: form.password, displayName: form.displayName || form.email.split('@')[0] }
+        ? { email: form.email, password: form.password, displayName: form.displayName || form.email.split('@')[0], inviteCode: form.inviteCode || undefined }
         : { email: form.email, password: form.password };
       const result = await fetch(`${API_BASE}${path}`, {
         method: 'POST',
@@ -551,6 +558,24 @@ function App() {
     await refresh();
   }
 
+  async function redeemCoupon(code) {
+    const result = await api('/api/coupons/redeem', {
+      method: 'POST',
+      body: JSON.stringify({ code })
+    });
+    setMessage(`Coupon redeemed: ${money(result.amountCents || 0)}`);
+    await refresh();
+  }
+
+  async function createWithdraw(payload) {
+    const result = await api('/api/withdraw-orders', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    setMessage(`Withdraw order #${result.id} created`);
+    await refresh();
+  }
+
   if (!token) {
     return (
       <main className="auth-page">
@@ -714,9 +739,13 @@ function App() {
             wallet={state.wallet}
             ledgers={pages.ledgers}
             orders={pages.orders}
+            withdraws={pages.withdraws}
+            invite={invite}
             filters={filters}
             updateFilter={updateFilter}
             recharge={recharge}
+            redeemCoupon={redeemCoupon}
+            createWithdraw={createWithdraw}
           />
         )}
 
@@ -1243,7 +1272,10 @@ function Workshop({ rows, api, refresh, setMessage }) {
   );
 }
 
-function BillingPanel({ summary, wallet, ledgers, orders, filters, updateFilter, recharge }) {
+function BillingPanel({ summary, wallet, ledgers, orders, withdraws, invite, filters, updateFilter, recharge, redeemCoupon, createWithdraw }) {
+  const [customRecharge, setCustomRecharge] = useState(1000);
+  const [couponCode, setCouponCode] = useState('');
+  const [withdrawForm, setWithdrawForm] = useState({ amountCents: 100, channel: 'alipay', accountName: '', accountNo: '' });
   const rechargeOptions = [
     { label: '¥100', amountCents: 10000 },
     { label: '¥500', amountCents: 50000 },
@@ -1261,6 +1293,54 @@ function BillingPanel({ summary, wallet, ledgers, orders, filters, updateFilter,
           {rechargeOptions.map((option) => (
             <button key={option.amountCents} onClick={() => recharge(option.amountCents)}><CreditCard size={15} /> 创建 {option.label} 订单</button>
           ))}
+        </div>
+      </div>
+
+      <div className="billing-tools">
+        <section className="panel billing-tool">
+          <div className="panel-head">
+            <h2>Custom recharge</h2>
+            <CreditCard size={17} />
+          </div>
+          <label>Amount cents<input type="number" min="1" value={customRecharge} onChange={(event) => setCustomRecharge(Number(event.target.value || 0))} /></label>
+          <button onClick={() => recharge(customRecharge)}>Create recharge order</button>
+        </section>
+        <section className="panel billing-tool">
+          <div className="panel-head">
+            <h2>Coupon</h2>
+            <ReceiptText size={17} />
+          </div>
+          <label>Code<input value={couponCode} onChange={(event) => setCouponCode(event.target.value)} placeholder="SF-COUPON" /></label>
+          <button onClick={() => redeemCoupon(couponCode)}>Redeem coupon</button>
+        </section>
+        <section className="panel billing-tool">
+          <div className="panel-head">
+            <h2>Withdraw</h2>
+            <CircleDollarSign size={17} />
+          </div>
+          <div className="grid two compact-grid">
+            <label>Amount cents<input type="number" min="1" value={withdrawForm.amountCents} onChange={(event) => setWithdrawForm({ ...withdrawForm, amountCents: Number(event.target.value || 0) })} /></label>
+            <label>Channel<select value={withdrawForm.channel} onChange={(event) => setWithdrawForm({ ...withdrawForm, channel: event.target.value })}>
+              <option value="alipay">Alipay</option>
+              <option value="wechat">WeChat</option>
+            </select></label>
+          </div>
+          <label>Account name<input value={withdrawForm.accountName} onChange={(event) => setWithdrawForm({ ...withdrawForm, accountName: event.target.value })} /></label>
+          <label>Account no<input value={withdrawForm.accountNo} onChange={(event) => setWithdrawForm({ ...withdrawForm, accountNo: event.target.value })} /></label>
+          <button onClick={() => createWithdraw(withdrawForm)}>Create withdraw order</button>
+        </section>
+      </div>
+
+      <div className="panel invite-panel">
+        <div>
+          <p className="eyebrow">Invite</p>
+          <h2>{invite?.code || 'No code'}</h2>
+          <p>Invite rewards are granted after the invitee completes a real recharge.</p>
+        </div>
+        <div className="mini-stats">
+          <span>Pending {invite?.stats?.pending || 0}</span>
+          <span>Granted {invite?.stats?.granted || 0}</span>
+          <span>{money(invite?.stats?.reward_cents || 0)}</span>
         </div>
       </div>
 
@@ -1290,7 +1370,25 @@ function BillingPanel({ summary, wallet, ledgers, orders, filters, updateFilter,
       />
 
       <PaginatedTable
-        title="钱包流水"
+        title="提现申请"
+        icon={<CircleDollarSign size={17} />}
+        page={withdraws}
+        filters={filters.withdraws}
+        onFilter={(patch) => updateFilter('withdraws', patch)}
+        statusOptions={['pending', 'approved', 'paid', 'rejected', 'cancelled']}
+        searchPlaceholder="Search withdraw status"
+        columns={[
+          ['id', 'ID'],
+          ['amount_cents', 'Amount'],
+          ['arrival_cents', 'Arrival'],
+          ['channel', 'Channel'],
+          ['status', 'Status'],
+          ['created_at', 'Created']
+        ]}
+      />
+
+      <PaginatedTable
+        title="Wallet ledgers"
         icon={<CircleDollarSign size={17} />}
         page={ledgers}
         filters={filters.ledgers}
