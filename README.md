@@ -1,12 +1,13 @@
 # seeFactory Dashboard
 
-seeFactory Dashboard 是用户侧控制台，面向创作者提供注册登录、模型测试、充值付费、no-code workflow 构建、创意工坊使用、调用记录、资产库和账号资料管理。它是 seeFactory 平台的核心生产界面，用户可以拖拽组件创建产出链条，将 workflow 保存、运行、导出为单文件，也可以发布到创意工坊。
+seeFactory Dashboard 是用户侧控制台，面向创作者提供注册登录、操练场、模型测试、充值付费、no-code workflow 构建、创意工坊使用、调用记录、资产库和账号资料管理。它是 seeFactory 平台的核心生产界面，用户可以拖拽组件创建产出链条，将 workflow 保存、运行、导出为单文件，也可以发布到创意工坊。
 
 ## 功能范围
 
 - 账号注册、登录、退出、资料维护和密码更新。
 - 总览面板：余额、累计消耗、请求次数、成功任务、最近调用和最近订单。
 - Workflow 控制台：组件拖拽、节点连接、节点配置、保存草稿、校验、运行、发布、导出。
+- 操练场：对标 new-api playground，保存服务端会话，支持文生文、图生文、文生图、文生视频、图生视频。
 - 创意工坊：浏览公开样例、运行样例、克隆开源 workflow。
 - 模型测试台：选择平台模型能力并发起测试调用。
 - 付费账单：创建充值订单、查看充值记录、钱包流水和模型扣费。
@@ -88,6 +89,12 @@ npm run preview
 dist/
 ```
 
+本轮验证命令：
+
+```bash
+npm run build
+```
+
 ## Workflow 单文件导出
 
 Dashboard 支持将 workflow 导出为单文件 manifest：
@@ -97,6 +104,15 @@ GET /api/workflows/:id/export
 ```
 
 导出内容包含 workflow schema、节点、边、运行配置、版本信息和元数据，适合跨环境迁移、归档或上传到创意工坊。
+
+## 操练场
+
+Dashboard 顶部导航包含 `操练场` tab。它不是本地浏览器模拟，而是调用 Backend 的 `/api/playground/*` 接口：
+
+- session、message、run 均由服务端保存。
+- 每次运行会选择平台模型能力，并写入账单或免费调度流水。
+- 文生图会产出图片资产，文生视频/图生视频会产出可追踪的视频任务资产。
+- 图生文和图生视频可以选择用户资产库中的图片资产作为输入。
 
 ## 后端依赖
 
@@ -114,6 +130,12 @@ Dashboard 依赖 Backend 的以下能力：
 - `POST /api/payments/recharge-orders`
 - `GET /api/models/capabilities`
 - `POST /api/models/test`
+- `GET /api/playground/sessions`
+- `POST /api/playground/sessions`
+- `DELETE /api/playground/sessions/:id`
+- `GET /api/playground/sessions/:id/messages`
+- `POST /api/playground/sessions/:id/run`
+- `POST /api/playground/sessions/:id/stop`
 - `GET /api/components`
 - `GET /api/workflows`
 - `POST /api/workflows`

@@ -30,6 +30,7 @@ import {
   LayoutDashboard,
   Link2,
   LogOut,
+  MessageSquareText,
   Moon,
   MousePointer2,
   PackageOpen,
@@ -46,6 +47,7 @@ import {
   UploadCloud,
   UserPlus,
   UserRound,
+  Video,
   Workflow
 } from 'lucide-react';
 import './styles.css';
@@ -55,6 +57,7 @@ const API_BASE = `http://${window.location.hostname || '192.168.31.26'}:18280`;
 const tabs = [
   ['overview', '总览', LayoutDashboard],
   ['workflow', '工作流', Workflow],
+  ['playground', '操练场', MessageSquareText],
   ['models', '模型测试台', FlaskConical],
   ['workshop', '创意工坊', PackageOpen],
   ['billing', '付费账单', CircleDollarSign],
@@ -108,6 +111,10 @@ function defaultConfig(component) {
   if (component.component_key === 'image.poster.render') {
     return { title: 'seeFactory Poster', palette: 'sage', width: 1200, height: 720 };
   }
+  if (component.component_key === 'text.dialogue') return { instruction: '输出适合创意生产的简洁文本' };
+  if (component.component_key === 'vision.describe') return { question: '请描述这张图片并提炼提示词' };
+  if (component.component_key === 'video.storyboard.generate') return { duration: 6, ratio: '9:16' };
+  if (component.component_key === 'video.image.animate') return { duration: 6, ratio: '9:16', motion: '轻微推进镜头' };
   if (component.component_key === 'image.resize') return { width: 1024, height: 1024 };
   if (component.component_key === 'asset.output') return { label: '最终资产' };
   return {};
@@ -659,6 +666,16 @@ function App() {
           </ReactFlowProvider>
         )}
 
+        {active === 'playground' && (
+          <PlaygroundPanel
+            api={api}
+            assets={state.assets}
+            models={state.models}
+            refresh={refresh}
+            setMessage={setMessage}
+          />
+        )}
+
         {active === 'models' && (
           <section className="grid two">
             <div className="panel">
@@ -774,6 +791,233 @@ function Overview({ state, summary, user, setActive, newWorkflow }) {
         <DataList title="最近调用" rows={summary?.recentTasks || []} fields={['id', 'status', 'workflow_title', 'cost_cents', 'created_at']} />
         <DataList title="最近充值订单" rows={summary?.recentOrders || []} fields={['id', 'amount_cents', 'status', 'channel', 'created_at']} />
       </div>
+    </section>
+  );
+}
+
+function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
+  const modes = [
+    ['chat', '对话', MessageSquareText, '文本生成、脚本、提示词'],
+    ['multimodal_chat', '图生文', Image, '上传或选择图片后提问'],
+    ['text_to_image', '生图', Sparkles, 'Prompt 生成图片资产'],
+    ['text_to_video', '生视频', Video, 'Prompt 生成视频任务'],
+    ['image_to_video', '图生视频', Play, '首帧图片生成视频任务']
+  ];
+  const [sessions, setSessions] = useState(emptyPage);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [mode, setMode] = useState('chat');
+  const [text, setText] = useState('为一个 AI 短剧镜头设计画面和动作');
+  const [assetId, setAssetId] = useState('');
+  const [params, setParams] = useState({ title: 'seeFactory 操练场', palette: 'sage', duration: 6, ratio: '9:16' });
+  const [busy, setBusy] = useState(false);
+  const [lastRun, setLastRun] = useState(null);
+
+  async function loadSessions(nextActiveId = activeSessionId) {
+    const page = await api('/api/playground/sessions?pageSize=30');
+    let items = page.items || [];
+    let selectedId = nextActiveId || items[0]?.id;
+    if (!items.length) {
+      const created = await api('/api/playground/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ title: '我的操练场', type: 'mixed' })
+      });
+      items = [created];
+      selectedId = created.id;
+    }
+    setSessions({ ...page, items });
+    setActiveSessionId(selectedId);
+    if (selectedId) await loadMessages(selectedId);
+  }
+
+  async function loadMessages(sessionId = activeSessionId) {
+    if (!sessionId) return;
+    const page = await api(`/api/playground/sessions/${sessionId}/messages?pageSize=80`);
+    setMessages(page.items || []);
+  }
+
+  useEffect(() => {
+    loadSessions().catch((error) => setMessage(error.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function createSession() {
+    const created = await api('/api/playground/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ title: `操练场 ${new Date().toLocaleTimeString()}`, type: 'mixed' })
+    });
+    await loadSessions(created.id);
+  }
+
+  async function deleteSession(sessionId) {
+    await api(`/api/playground/sessions/${sessionId}`, { method: 'DELETE' });
+    setMessage('操练场 session 已删除');
+    setActiveSessionId(null);
+    await loadSessions(null);
+  }
+
+  async function runPlayground() {
+    if (!activeSessionId) return;
+    setBusy(true);
+    try {
+      const needsAsset = mode === 'multimodal_chat' || mode === 'image_to_video';
+      if (needsAsset && !assetId) {
+        setMessage('当前模式需要先选择一个图片资产');
+        return;
+      }
+      const input = {
+        text,
+        prompt: text,
+        assetId: assetId ? Number(assetId) : undefined,
+        assetIds: assetId ? [Number(assetId)] : []
+      };
+      const result = await api(`/api/playground/sessions/${activeSessionId}/run`, {
+        method: 'POST',
+        body: JSON.stringify({ mode, input, params })
+      });
+      setLastRun(result);
+      setMessage(`操练场运行完成，消耗 ${money(result.billing?.actualCostCents || 0)}`);
+      await loadMessages(activeSessionId);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const activeSession = (sessions.items || []).find((item) => item.id === activeSessionId);
+  const imageAssets = (assets || []).filter((asset) => ['image', 'poster', 'banner'].includes(asset.asset_type || asset.assetType));
+  const modelsByNodeType = Object.groupBy
+    ? Object.groupBy(models || [], (model) => model.schema?.nodeType || model.modality)
+    : {};
+
+  return (
+    <section className="playground-shell">
+      <aside className="panel playground-sessions">
+        <div className="panel-head">
+          <div>
+            <span className="eyebrow">Playground</span>
+            <h2>操练场</h2>
+          </div>
+          <button onClick={createSession}><Plus size={15} /> 新建</button>
+        </div>
+        <div className="session-list">
+          {(sessions.items || []).map((session) => (
+            <button
+              key={session.id}
+              className={session.id === activeSessionId ? 'active session-item' : 'session-item'}
+              onClick={() => {
+                setActiveSessionId(session.id);
+                loadMessages(session.id);
+              }}
+            >
+              <span>{session.title}</span>
+              <small>{session.last_mode || session.session_type} · {money(session.total_cost_cents || 0)}</small>
+            </button>
+          ))}
+        </div>
+        {activeSession && (
+          <button className="danger soft" onClick={() => deleteSession(activeSession.id)}><Trash2 size={15} /> 删除当前 session</button>
+        )}
+      </aside>
+
+      <main className="panel playground-chat">
+        <div className="panel-head">
+          <div>
+            <span className="eyebrow">Session</span>
+            <h2>{activeSession?.title || '操练场'}</h2>
+          </div>
+          <span className="pill">{messages.length} 条消息</span>
+        </div>
+        <div className="message-stream">
+          {!messages.length && <div className="empty-table">选择能力并运行，session 会自动保存到服务器。</div>}
+          {messages.map((item) => (
+            <article key={item.id} className={`chat-message ${item.role}`}>
+              <span>{item.role === 'user' ? '你' : item.role === 'assistant' ? 'seeFactory' : '系统'}</span>
+              <p>{item.content || '已保存多模态输入'}</p>
+              {!!item.assetRefs?.length && <small>资产：{item.assetRefs.join(', ')}</small>}
+              {!!item.cost_cents && <small>消耗 {money(item.cost_cents)}</small>}
+            </article>
+          ))}
+        </div>
+        {lastRun?.assets?.length > 0 && (
+          <div className="playground-assets">
+            {lastRun.assets.map((asset) => (
+              <a key={asset.id} href={assetUrl(asset.url)} target="_blank" rel="noreferrer">
+                {asset.assetType === 'video' ? <Video size={18} /> : <Image size={18} />}
+                #{asset.id} {asset.title}
+              </a>
+            ))}
+          </div>
+        )}
+      </main>
+
+      <aside className="panel playground-config">
+        <span className="eyebrow">Mode</span>
+        <div className="mode-grid">
+          {modes.map(([key, label, Icon, hint]) => (
+            <button key={key} className={mode === key ? 'active' : ''} onClick={() => setMode(key)}>
+              <Icon size={16} />
+              <span>{label}</span>
+              <small>{hint}</small>
+            </button>
+          ))}
+        </div>
+        <label>
+          输入
+          <textarea value={text} onChange={(event) => setText(event.target.value)} />
+        </label>
+        {(mode === 'multimodal_chat' || mode === 'image_to_video') && (
+          <label>
+            图片资产
+            <select value={assetId} onChange={(event) => setAssetId(event.target.value)}>
+              <option value="">选择图片资产</option>
+              {imageAssets.map((asset) => <option key={asset.id} value={asset.id}>#{asset.id} {asset.title}</option>)}
+            </select>
+          </label>
+        )}
+        {mode === 'text_to_image' && (
+          <>
+            <label>
+              标题
+              <input value={params.title} onChange={(event) => setParams({ ...params, title: event.target.value })} />
+            </label>
+            <label>
+              色调
+              <select value={params.palette} onChange={(event) => setParams({ ...params, palette: event.target.value })}>
+                <option value="sage">Sage</option>
+                <option value="graphite">Graphite</option>
+                <option value="clay">Clay</option>
+              </select>
+            </label>
+          </>
+        )}
+        {(mode === 'text_to_video' || mode === 'image_to_video') && (
+          <>
+            <label>
+              时长
+              <input type="number" min="2" max="30" value={params.duration} onChange={(event) => setParams({ ...params, duration: Number(event.target.value) })} />
+            </label>
+            <label>
+              画幅
+              <select value={params.ratio} onChange={(event) => setParams({ ...params, ratio: event.target.value })}>
+                <option value="9:16">9:16</option>
+                <option value="16:9">16:9</option>
+                <option value="1:1">1:1</option>
+              </select>
+            </label>
+          </>
+        )}
+        <div className="playground-models">
+          <strong>可用能力</strong>
+          {(models || []).slice(0, 6).map((model) => (
+            <span key={model.model_key}>{model.name}</span>
+          ))}
+          {!Object.keys(modelsByNodeType).length && <span>等待模型能力同步</span>}
+        </div>
+        <button className="primary wide" disabled={busy || !activeSessionId} onClick={runPlayground}>
+          <Play size={16} /> {busy ? '运行中' : '运行操练'}
+        </button>
+      </aside>
     </section>
   );
 }
