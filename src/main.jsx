@@ -226,6 +226,7 @@ function App() {
   const [modelResult, setModelResult] = useState(null);
   const [activeTask, setActiveTask] = useState(null);
   const [taskEvents, setTaskEvents] = useState([]);
+  const [taskNodes, setTaskNodes] = useState([]);
   const [estimate, setEstimate] = useState(0);
 
   const componentsByKey = useMemo(
@@ -342,10 +343,11 @@ function App() {
       setEstimate(0);
       return;
     }
-    api('/api/billing/estimate', { method: 'POST', body: JSON.stringify({ graph: flowToGraph(nodes, edges) }) })
+    const estimatePath = draft.id ? `/api/workflows/${draft.id}/estimate` : '/api/billing/estimate';
+    api(estimatePath, { method: 'POST', body: JSON.stringify({ graph: flowToGraph(nodes, edges) }) })
       .then((result) => setEstimate(result.estimatedCostCents))
       .catch(() => setEstimate(0));
-  }, [api, edges, nodes, token]);
+  }, [api, draft.id, edges, nodes, token]);
 
   async function submitAuth(event) {
     event.preventDefault();
@@ -507,12 +509,14 @@ function App() {
   }
 
   async function openTask(taskId) {
-    const [task, events] = await Promise.all([
+    const [task, events, runNodes] = await Promise.all([
       api(`/api/tasks/${taskId}`),
-      api(`/api/tasks/${taskId}/events`)
+      api(`/api/tasks/${taskId}/events`),
+      api(`/api/tasks/${taskId}/nodes`)
     ]);
     setActiveTask(task);
     setTaskEvents(events);
+    setTaskNodes(Array.isArray(runNodes) ? runNodes : []);
     setActive('tasks');
   }
 
@@ -544,6 +548,31 @@ function App() {
     link.download = `seefactory-workflow-${id}.json`;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function importWorkflowFile() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json,.seeflow';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const manifest = JSON.parse(await file.text());
+        const created = await api('/api/workflows/import', {
+          method: 'POST',
+          body: JSON.stringify(manifest)
+        });
+        setWorkflowEditorMode('existing');
+        loadWorkflow(created);
+        setActive('workflow');
+        setMessage(`已导入 workflow：${created.title}`);
+        await refresh();
+      } catch (error) {
+        setMessage(error.message || '导入失败，请检查 manifest 文件');
+      }
+    };
+    input.click();
   }
 
   async function runModelTest() {
@@ -697,6 +726,7 @@ function App() {
               runWorkflow={runWorkflow}
               publishWorkflow={publishWorkflow}
               downloadWorkflow={downloadWorkflow}
+              importWorkflowFile={importWorkflowFile}
             />
           </ReactFlowProvider>
         )}
@@ -770,6 +800,7 @@ function App() {
             activeTask={activeTask}
             taskAsset={taskAsset}
             taskEvents={taskEvents}
+            taskNodes={taskNodes}
             openTask={openTask}
             refreshProviderJob={refreshProviderJob}
           />
@@ -1092,7 +1123,8 @@ function WorkflowPanel(props) {
     validateWorkflow,
     runWorkflow,
     publishWorkflow,
-    downloadWorkflow
+    downloadWorkflow,
+    importWorkflowFile
   } = props;
   const { screenToFlowPosition } = useReactFlow();
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
@@ -1159,6 +1191,7 @@ function WorkflowPanel(props) {
             <button onClick={saveWorkflow}><Save size={15} /> 保存</button>
             <button className="primary" onClick={runWorkflow}><Play size={15} /> 运行</button>
             <button onClick={publishWorkflow}><UploadCloud size={15} /> 发布</button>
+            <button onClick={importWorkflowFile}><UploadCloud size={15} /> 导入</button>
             <button onClick={downloadWorkflow}><Download size={15} /> 导出</button>
           </div>
         </div>
@@ -1422,7 +1455,7 @@ function BillingPanel({ summary, wallet, ledgers, orders, withdraws, invite, fil
   );
 }
 
-function UsagePanel({ tasks, providerJobs, filters, providerJobFilters, updateFilter, updateProviderJobFilter, activeTask, taskAsset, taskEvents, openTask, refreshProviderJob }) {
+function UsagePanel({ tasks, providerJobs, filters, providerJobFilters, updateFilter, updateProviderJobFilter, activeTask, taskAsset, taskEvents, taskNodes, openTask, refreshProviderJob }) {
   return (
     <section className="grid two usage-grid">
       <PaginatedTable
@@ -1484,6 +1517,19 @@ function UsagePanel({ tasks, providerJobs, filters, providerJobFilters, updateFi
               </figure>
             )}
             <pre>{JSON.stringify(activeTask.input || {}, null, 2)}</pre>
+            <div className="event-list">
+              {taskNodes.length ? taskNodes.map((node) => (
+                <div key={node.id || node.node_id}>
+                  <span>{node.node_label || node.label || node.component_key || node.node_id} · {node.status}</span>
+                  <p>{node.error_message || `版本 ${node.workflow_version_id || '-'} / 节点 ${node.node_id}`}</p>
+                </div>
+              )) : (
+                <div>
+                  <span>节点明细</span>
+                  <p>暂无节点级执行记录</p>
+                </div>
+              )}
+            </div>
             <div className="event-list">
               {taskEvents.map((event) => (
                 <div key={event.id}>
