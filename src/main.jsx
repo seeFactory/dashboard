@@ -186,6 +186,7 @@ function App() {
     ledgers: emptyPage,
     orders: emptyPage,
     withdraws: emptyPage,
+    providerJobs: emptyPage,
     tasks: emptyPage,
     assets: { ...emptyPage, pageSize: 12 }
   });
@@ -193,6 +194,7 @@ function App() {
     ledgers: { page: 1, pageSize: 10, q: '', direction: 'all' },
     orders: { page: 1, pageSize: 10, q: '', status: 'all' },
     withdraws: { page: 1, pageSize: 10, status: 'all' },
+    providerJobs: { page: 1, pageSize: 10, q: '', status: 'all' },
     tasks: { page: 1, pageSize: 10, q: '', status: 'all' },
     assets: { page: 1, pageSize: 12, q: '', assetType: 'all' }
   });
@@ -255,7 +257,7 @@ function App() {
     if (!token) return;
     setLoading(true);
     try {
-      const [me, components, models, workflows, workshop, wallet, userSummary, inviteInfo, ledgersPage, ordersPage, withdrawsPage, tasksPage, assetsPage] = await Promise.all([
+      const [me, components, models, workflows, workshop, wallet, userSummary, inviteInfo, ledgersPage, ordersPage, withdrawsPage, providerJobsPage, tasksPage, assetsPage] = await Promise.all([
         api('/api/users/me'),
         api('/api/components'),
         api('/api/models/capabilities'),
@@ -267,6 +269,7 @@ function App() {
         api(`/api/wallet/ledgers?${queryFrom(filters.ledgers)}`),
         api(`/api/payments/recharge-orders?${queryFrom(filters.orders)}`),
         api(`/api/withdraw-orders?${queryFrom(filters.withdraws)}`),
+        api(`/api/provider-jobs?${queryFrom(filters.providerJobs)}`),
         api(`/api/tasks?${queryFrom(filters.tasks)}`),
         api(`/api/assets?${queryFrom(filters.assets)}`)
       ]);
@@ -283,6 +286,7 @@ function App() {
         ledgers: normalizePage(ledgersPage, filters.ledgers.pageSize),
         orders: normalizePage(ordersPage, filters.orders.pageSize),
         withdraws: normalizePage(withdrawsPage, filters.withdraws.pageSize),
+        providerJobs: normalizePage(providerJobsPage, filters.providerJobs.pageSize),
         tasks: normalizePage(tasksPage, filters.tasks.pageSize),
         assets: normalizePage(assetsPage, filters.assets.pageSize)
       };
@@ -576,6 +580,12 @@ function App() {
     await refresh();
   }
 
+  async function refreshProviderJob(row) {
+    const result = await api(`/api/provider-jobs/${row.id}/refresh`, { method: 'POST' });
+    setMessage(`Provider job #${row.id}: ${result.status || row.status}`);
+    await refresh();
+  }
+
   if (!token) {
     return (
       <main className="auth-page">
@@ -752,12 +762,16 @@ function App() {
         {active === 'usage' && (
           <UsagePanel
             tasks={pages.tasks}
+            providerJobs={pages.providerJobs}
             filters={filters.tasks}
+            providerJobFilters={filters.providerJobs}
             updateFilter={(patch) => updateFilter('tasks', patch)}
+            updateProviderJobFilter={(patch) => updateFilter('providerJobs', patch)}
             activeTask={activeTask}
             taskAsset={taskAsset}
             taskEvents={taskEvents}
             openTask={openTask}
+            refreshProviderJob={refreshProviderJob}
           />
         )}
 
@@ -1408,7 +1422,7 @@ function BillingPanel({ summary, wallet, ledgers, orders, withdraws, invite, fil
   );
 }
 
-function UsagePanel({ tasks, filters, updateFilter, activeTask, taskAsset, taskEvents, openTask }) {
+function UsagePanel({ tasks, providerJobs, filters, providerJobFilters, updateFilter, updateProviderJobFilter, activeTask, taskAsset, taskEvents, openTask, refreshProviderJob }) {
   return (
     <section className="grid two usage-grid">
       <PaginatedTable
@@ -1428,6 +1442,28 @@ function UsagePanel({ tasks, filters, updateFilter, activeTask, taskAsset, taskE
           ['created_at', '创建时间']
         ]}
         action={(row) => <button onClick={() => openTask(row.id)}>查看</button>}
+      />
+      <PaginatedTable
+        title="Provider 视频任务"
+        icon={<Video size={17} />}
+        page={providerJobs}
+        filters={providerJobFilters}
+        onFilter={updateProviderJobFilter}
+        statusOptions={['queued', 'running', 'waiting_callback', 'succeeded', 'failed', 'cancelled']}
+        searchPlaceholder="Provider、模型、上游任务号或状态"
+        columns={[
+          ['id', 'ID'],
+          ['provider_key', 'Provider'],
+          ['model_key', '模型'],
+          ['upstream_job_id', '上游任务'],
+          ['mode', '模式'],
+          ['status', '状态'],
+          ['asset_id', '资产'],
+          ['updated_at', '更新时间']
+        ]}
+        action={(row) => ['queued', 'running', 'waiting_callback'].includes(row.status)
+          ? <button onClick={() => refreshProviderJob(row)}><RefreshCw size={15} /> 刷新</button>
+          : <span>{row.status}</span>}
       />
       <div className="panel task-detail">
         <div className="panel-head">
