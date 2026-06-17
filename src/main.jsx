@@ -114,6 +114,30 @@ const defaultModelTest = {
   maxTokens: 800
 };
 
+const defaultPlaygroundParams = {
+  title: 'seeFactory 操练场',
+  palette: 'sage',
+  ratio: '9:16',
+  size: '1024x1792',
+  width: 1024,
+  height: 1792,
+  quality: 'standard',
+  style: 'cinematic',
+  background: 'auto',
+  outputFormat: 'url',
+  seed: '',
+  negativePrompt: '',
+  resolution: '720p',
+  duration: 6,
+  fps: 24,
+  motionStrength: 'medium',
+  cameraMotion: 'slow_push',
+  motion: '轻微推进镜头，主体自然运动',
+  systemPrompt: '',
+  temperature: 0.7,
+  maxTokens: 800
+};
+
 function money(cents = 0) {
   return `¥${(Number(cents) / 100).toFixed(2)}`;
 }
@@ -1441,8 +1465,9 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
   const [selectedModel, setSelectedModel] = useState('');
   const [text, setText] = useState('为一个 AI 短剧镜头设计画面和动作');
   const [assetId, setAssetId] = useState('');
-  const [params, setParams] = useState({ title: 'seeFactory 操练场', palette: 'sage', duration: 6, ratio: '9:16' });
+  const [params, setParams] = useState(defaultPlaygroundParams);
   const [busy, setBusy] = useState(false);
+  const [busyStage, setBusyStage] = useState('');
   const [lastRun, setLastRun] = useState(null);
   const currentMode = modes.find(([key]) => key === mode) || modes[0];
   const currentNodeType = currentMode[4];
@@ -1451,6 +1476,23 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
     [models, currentNodeType]
   );
   const selectedModelRow = modelsForMode.find((model) => model.model_key === selectedModel) || null;
+  const supportsImageParams = mode === 'text_to_image';
+  const supportsVideoParams = mode === 'text_to_video' || mode === 'image_to_video';
+  const supportsTextParams = mode === 'chat' || mode === 'multimodal_chat';
+  const needsAsset = mode === 'multimodal_chat' || mode === 'image_to_video';
+
+  function updateParams(patch) {
+    setParams((current) => ({ ...current, ...patch }));
+  }
+
+  function applyPlaygroundSizePreset(value) {
+    const preset = imageSizePresets.find((item) => item.value === value);
+    if (!preset) {
+      updateParams({ size: value });
+      return;
+    }
+    updateParams({ size: preset.value, width: preset.width, height: preset.height, ratio: preset.ratio });
+  }
 
   useEffect(() => {
     if (!modelsForMode.length) {
@@ -1508,12 +1550,14 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
   async function runPlayground() {
     if (!activeSessionId) return;
     setBusy(true);
+    setBusyStage('正在提交操练请求');
+    const waitingTimer = window.setTimeout(() => setBusyStage('模型正在生成，等待上游响应'), 900);
+    const longTimer = window.setTimeout(() => setBusyStage('任务仍在处理，视频或高分辨率图片可能需要更久'), 9000);
     try {
       if (!selectedModel) {
         setMessage('当前模式没有可用模型，请先让管理员配置并上线模型能力');
         return;
       }
-      const needsAsset = mode === 'multimodal_chat' || mode === 'image_to_video';
       if (needsAsset && !assetId) {
         setMessage('当前模式需要先选择一个图片资产');
         return;
@@ -1529,11 +1573,15 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
         body: JSON.stringify({ mode, capabilityKey: selectedModel, input, params })
       });
       setLastRun(result);
+      setBusyStage('正在保存 session 与资产');
       setMessage(`操练场运行完成，消耗 ${money(result.billing?.actualCostCents || 0)}`);
       await loadMessages(activeSessionId);
       await refresh();
     } finally {
+      window.clearTimeout(waitingTimer);
+      window.clearTimeout(longTimer);
       setBusy(false);
+      setBusyStage('');
     }
   }
 
@@ -1588,6 +1636,13 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
               {!!item.cost_cents && <small>消耗 {money(item.cost_cents)}</small>}
             </article>
           ))}
+          {busy && (
+            <article className="chat-message assistant pending">
+              <span>seeFactory</span>
+              <p>{busyStage || '正在等待模型响应'}</p>
+              <small>当前 session 会在完成后自动保存结果。</small>
+            </article>
+          )}
         </div>
         {lastRun?.assets?.length > 0 && (
           <div className="playground-assets">
@@ -1612,17 +1667,20 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
             </button>
           ))}
         </div>
-        <label>
-          模型能力
-          <select value={selectedModel} onChange={(event) => setSelectedModel(event.target.value)}>
-            {!modelsForMode.length && <option value="">当前模式暂无可用模型</option>}
-            {modelsForMode.map((model) => (
-              <option key={model.model_key} value={model.model_key}>
-                {model.name} · {money(model.price_cents)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="playground-model-picker">
+          <label>
+            当前模式可选模型
+            <select value={selectedModel} onChange={(event) => setSelectedModel(event.target.value)}>
+              {!modelsForMode.length && <option value="">当前模式暂无可用模型</option>}
+              {modelsForMode.map((model) => (
+                <option key={model.model_key} value={model.model_key}>
+                  {model.name} · {nodeTypeLabel(modelNodeType(model))} · {money(model.price_cents)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!modelsForMode.length && <small>等待管理员配置并上线该模式的模型能力。</small>}
+        </div>
         <div className="playground-model-card">
           <span>运行前预估</span>
           <strong>{selectedModelRow ? money(selectedModelRow.price_cents) : '暂无模型'}</strong>
@@ -1645,58 +1703,173 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
             </select>
           </label>
         )}
-        {mode === 'text_to_image' && (
-          <>
-            <label>
-              标题
-              <input value={params.title} onChange={(event) => setParams({ ...params, title: event.target.value })} />
-            </label>
-            <label>
-              色调
-              <select value={params.palette} onChange={(event) => setParams({ ...params, palette: event.target.value })}>
-                <option value="sage">Sage</option>
-                <option value="graphite">Graphite</option>
-                <option value="clay">Clay</option>
-              </select>
-            </label>
-          </>
-        )}
-        {(mode === 'text_to_video' || mode === 'image_to_video') && (
-          <>
-            <label>
-              时长
-              <input type="number" min="2" max="30" value={params.duration} onChange={(event) => setParams({ ...params, duration: Number(event.target.value) })} />
-            </label>
-            <label>
-              画幅
-              <select value={params.ratio} onChange={(event) => setParams({ ...params, ratio: event.target.value })}>
-                <option value="9:16">9:16</option>
-                <option value="16:9">16:9</option>
-                <option value="1:1">1:1</option>
-              </select>
-            </label>
-          </>
-        )}
-        <div className="playground-models">
-          <strong>当前模式可选模型</strong>
-          {modelsForMode.map((model) => (
-            <button
-              type="button"
-              key={model.model_key}
-              className={model.model_key === selectedModel ? 'active' : ''}
-              onClick={() => setSelectedModel(model.model_key)}
-            >
-              <span>{model.name}</span>
-              <small>{money(model.price_cents)}</small>
-            </button>
-          ))}
-          {!modelsForMode.length && <span>等待管理员配置该模式的模型能力</span>}
-        </div>
+        <section className="settings-panel playground-params">
+          <div className="settings-title">
+            <SlidersHorizontal size={17} />
+            <strong>运行参数</strong>
+            <span>{nodeTypeLabel(currentNodeType)}</span>
+          </div>
+
+          {supportsTextParams && (
+            <div className="settings-grid compact">
+              <label>
+                温度
+                <input type="number" min="0" max="2" step="0.1" value={params.temperature} onChange={(event) => updateParams({ temperature: Number(event.target.value) })} />
+              </label>
+              <label>
+                最大 token
+                <input type="number" min="128" max="8192" step="128" value={params.maxTokens} onChange={(event) => updateParams({ maxTokens: Number(event.target.value) })} />
+              </label>
+              <label className="span-two">
+                系统提示词
+                <input value={params.systemPrompt} onChange={(event) => updateParams({ systemPrompt: event.target.value })} placeholder="可选" />
+              </label>
+            </div>
+          )}
+
+          {supportsImageParams && (
+            <>
+              <div className="settings-grid compact">
+                <label>
+                  标题
+                  <input value={params.title} onChange={(event) => updateParams({ title: event.target.value })} />
+                </label>
+                <label>
+                  色调
+                  <select value={params.palette} onChange={(event) => updateParams({ palette: event.target.value })}>
+                    <option value="sage">Sage</option>
+                    <option value="graphite">Graphite</option>
+                    <option value="clay">Clay</option>
+                  </select>
+                </label>
+                <label>
+                  尺寸预设
+                  <select value={params.size} onChange={(event) => applyPlaygroundSizePreset(event.target.value)}>
+                    {imageSizePresets.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
+                  </select>
+                </label>
+                <label>
+                  画幅
+                  <select value={params.ratio} onChange={(event) => updateParams({ ratio: event.target.value })}>
+                    {aspectRatioOptions.map((ratio) => <option key={ratio} value={ratio}>{ratio}</option>)}
+                  </select>
+                </label>
+                <label>
+                  宽度
+                  <input type="number" min="512" max="4096" step="64" value={params.width} onChange={(event) => updateParams({ width: Number(event.target.value), size: `${event.target.value}x${params.height}` })} />
+                </label>
+                <label>
+                  高度
+                  <input type="number" min="512" max="4096" step="64" value={params.height} onChange={(event) => updateParams({ height: Number(event.target.value), size: `${params.width}x${event.target.value}` })} />
+                </label>
+                <label>
+                  质量
+                  <select value={params.quality} onChange={(event) => updateParams({ quality: event.target.value })}>
+                    <option value="auto">自动</option>
+                    <option value="standard">标准</option>
+                    <option value="high">高质量</option>
+                  </select>
+                </label>
+                <label>
+                  风格
+                  <select value={params.style} onChange={(event) => updateParams({ style: event.target.value })}>
+                    <option value="natural">自然</option>
+                    <option value="vivid">鲜明</option>
+                    <option value="cinematic">电影感</option>
+                    <option value="product">产品图</option>
+                  </select>
+                </label>
+              </div>
+              <div className="settings-grid compact">
+                <label>
+                  背景
+                  <select value={params.background} onChange={(event) => updateParams({ background: event.target.value })}>
+                    <option value="auto">自动</option>
+                    <option value="transparent">透明</option>
+                    <option value="opaque">不透明</option>
+                  </select>
+                </label>
+                <label>
+                  输出格式
+                  <select value={params.outputFormat} onChange={(event) => updateParams({ outputFormat: event.target.value })}>
+                    <option value="url">URL</option>
+                    <option value="png">PNG</option>
+                    <option value="jpeg">JPEG</option>
+                    <option value="webp">WebP</option>
+                  </select>
+                </label>
+              </div>
+            </>
+          )}
+
+          {supportsVideoParams && (
+            <>
+              <div className="settings-grid compact">
+                <label>
+                  画幅
+                  <select value={params.ratio} onChange={(event) => updateParams({ ratio: event.target.value })}>
+                    {aspectRatioOptions.map((ratio) => <option key={ratio} value={ratio}>{ratio}</option>)}
+                  </select>
+                </label>
+                <label>
+                  分辨率
+                  <select value={params.resolution} onChange={(event) => updateParams({ resolution: event.target.value })}>
+                    {videoResolutionOptions.map((resolution) => <option key={resolution} value={resolution}>{resolution}</option>)}
+                  </select>
+                </label>
+                <label>
+                  时长
+                  <select value={params.duration} onChange={(event) => updateParams({ duration: Number(event.target.value) })}>
+                    {videoDurationOptions.map((duration) => <option key={duration} value={duration}>{duration} 秒</option>)}
+                  </select>
+                </label>
+                <label>
+                  帧率
+                  <input type="number" min="12" max="60" value={params.fps} onChange={(event) => updateParams({ fps: Number(event.target.value) })} />
+                </label>
+                <label>
+                  运动强度
+                  <select value={params.motionStrength} onChange={(event) => updateParams({ motionStrength: event.target.value })}>
+                    <option value="low">轻微</option>
+                    <option value="medium">适中</option>
+                    <option value="high">强烈</option>
+                  </select>
+                </label>
+                <label>
+                  镜头运动
+                  <select value={params.cameraMotion} onChange={(event) => updateParams({ cameraMotion: event.target.value })}>
+                    <option value="static">固定镜头</option>
+                    <option value="slow_push">慢推</option>
+                    <option value="pan">横移</option>
+                    <option value="orbit">环绕</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                运动说明
+                <input value={params.motion} onChange={(event) => updateParams({ motion: event.target.value })} placeholder="镜头、主体动作、节奏" />
+              </label>
+            </>
+          )}
+
+          {(supportsImageParams || supportsVideoParams) && (
+            <div className="settings-grid compact">
+              <label>
+                Seed
+                <input value={params.seed} onChange={(event) => updateParams({ seed: event.target.value })} placeholder="可选，便于复现" />
+              </label>
+              <label className="span-two">
+                负面词
+                <input value={params.negativePrompt} onChange={(event) => updateParams({ negativePrompt: event.target.value })} placeholder="不要出现的元素、风格或缺陷" />
+              </label>
+            </div>
+          )}
+        </section>
         {busy && (
           <div className="running-card compact">
             <Loader2 className="spin" size={18} />
             <div>
-              <strong>正在等待模型响应</strong>
+              <strong>{busyStage || '正在等待模型响应'}</strong>
               <p>操练结果会保存到当前 session。</p>
             </div>
             <span className="progress-line" />

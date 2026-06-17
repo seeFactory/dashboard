@@ -563,7 +563,7 @@ small,
 
 .playground-shell {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 330px;
+  grid-template-columns: 260px minmax(0, 1fr) 390px;
   gap: 14px;
   min-height: calc(100vh - 130px);
 }
@@ -624,6 +624,24 @@ small,
   justify-self: start;
 }
 
+.chat-message.pending {
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+}
+
+.chat-message.pending::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: progress-sweep 1.5s ease-in-out infinite;
+}
+
 .chat-message span {
   display: block;
   font-size: 12px;
@@ -670,6 +688,32 @@ small,
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.playground-model-picker {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.playground-model-picker small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.playground-params {
+  display: grid;
+  gap: 12px;
+  margin: 10px 0 16px;
+  box-shadow: none;
+}
+
+.settings-grid.compact {
+  gap: 10px;
+}
+
+.settings-grid.compact label {
+  min-width: 0;
 }
 
 .playground-assets a,
