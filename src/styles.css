@@ -701,6 +701,59 @@ small,
   line-height: 1.45;
 }
 
+.image-asset-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.image-asset-picker label {
+  min-width: 0;
+}
+
+.image-asset-picker > small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.soft-upload {
+  min-height: var(--control-h);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
+}
+
+.asset-choice {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 82%, var(--surface-2));
+  padding: 8px;
+}
+
+.asset-choice img {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.asset-choice span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .playground-params {
   display: grid;
   gap: 12px;
@@ -1684,6 +1737,10 @@ pre {
 
   .settings-grid,
   .model-lab-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .image-asset-picker {
     grid-template-columns: 1fr;
   }
 

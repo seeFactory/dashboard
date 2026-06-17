@@ -147,6 +147,15 @@ function assetUrl(url) {
   return url.startsWith('http') ? url : `${API_BASE}${url}`;
 }
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('读取文件失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
 function noticeText(value) {
   if (!value) return '';
   if (typeof value === 'string') return value;
@@ -511,6 +520,38 @@ function App() {
       setLoading(false);
     }
   }, [api, filters, token]);
+
+  const uploadImageAsset = useCallback(async (file, context = 'dashboard') => {
+    if (!file) return null;
+    if (!String(file.type || '').startsWith('image/')) {
+      setMessage('请选择图片文件后再上传', 'warning');
+      return null;
+    }
+    const maxBytes = 12 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setMessage('图片不能超过 12MB，请压缩后再上传', 'warning');
+      return null;
+    }
+    const dataUrl = await fileToDataUrl(file);
+    const title = String(file.name || '本地图片').replace(/\.[^.]+$/, '') || '本地图片';
+    const asset = await api('/api/assets/upload', {
+      method: 'POST',
+      body: JSON.stringify({
+        assetType: 'image',
+        title,
+        dataUrl,
+        metadata: {
+          uploadedFrom: context,
+          originalName: file.name || '',
+          originalSize: file.size,
+          originalType: file.type || ''
+        }
+      })
+    });
+    setMessage(`已上传图片资产 #${asset.id}`, 'success');
+    await refresh();
+    return asset;
+  }, [api, refresh, setMessage]);
 
   const loadWorkflow = useCallback((workflow) => {
     const flow = graphToFlow(workflow.graph, componentsByKey);
@@ -1013,6 +1054,7 @@ function App() {
             models={state.models}
             refresh={refresh}
             setMessage={setMessage}
+            uploadImageAsset={uploadImageAsset}
           />
         )}
 
@@ -1028,6 +1070,7 @@ function App() {
               modelRunStage={modelRunStage}
               runModelTest={runModelTest}
               openDialog={openDialog}
+              uploadImageAsset={uploadImageAsset}
             />
             <DataList title="模型池" rows={state.models} fields={['name', 'modality', 'provider', 'price_cents', 'status']} />
           </section>
@@ -1147,15 +1190,62 @@ function AppDialog({ dialog, onClose }) {
   );
 }
 
-function ModelTestPanel({ models, assets, modelTest, setModelTest, modelResult, modelTesting, modelRunStage, runModelTest, openDialog }) {
+function ImageAssetPicker({ label = '图片资产', assets, value, onChange, uploadImageAsset, context = 'image_picker', disabled = false }) {
+  const [uploading, setUploading] = useState(false);
+  const imageAssets = (assets || []).filter((asset) => ['image', 'poster', 'banner'].includes(asset.asset_type || asset.assetType));
+  const selectedAsset = imageAssets.find((asset) => String(asset.id) === String(value));
+
+  async function pickLocalImage() {
+    if (!uploadImageAsset || disabled || uploading) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/webp,image/gif,image/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      setUploading(true);
+      try {
+        const asset = await uploadImageAsset(file, context);
+        if (asset?.id) onChange(String(asset.id));
+      } finally {
+        setUploading(false);
+      }
+    };
+    input.click();
+  }
+
+  return (
+    <div className="image-asset-picker">
+      <label>
+        {label}
+        <select value={value || ''} disabled={disabled || uploading} onChange={(event) => onChange(event.target.value)}>
+          <option value="">选择图片资产</option>
+          {imageAssets.map((asset) => <option key={asset.id} value={asset.id}>#{asset.id} {asset.title}</option>)}
+        </select>
+      </label>
+      <button type="button" className="soft-upload" disabled={disabled || uploading} onClick={pickLocalImage}>
+        {uploading ? <Loader2 className="spin" size={15} /> : <UploadCloud size={15} />}
+        {uploading ? '上传中' : '上传本地图片'}
+      </button>
+      {selectedAsset ? (
+        <div className="asset-choice">
+          <img src={assetUrl(selectedAsset.url)} alt={selectedAsset.title} />
+          <span>已选择 #{selectedAsset.id} {selectedAsset.title}</span>
+        </div>
+      ) : (
+        <small>支持从本地上传图片，上传后会自动加入资产库并选中。</small>
+      )}
+    </div>
+  );
+}
+
+function ModelTestPanel({ models, assets, modelTest, setModelTest, modelResult, modelTesting, modelRunStage, runModelTest, openDialog, uploadImageAsset }) {
   const selectedModel = (models || []).find((model) => model.model_key === modelTest.modelKey) || null;
   const nodeType = modelNodeType(selectedModel);
-  const imageAssets = (assets || []).filter((asset) => ['image', 'poster', 'banner'].includes(asset.asset_type || asset.assetType));
   const requiresAsset = nodeType === 'image_to_text' || nodeType === 'image_to_video';
   const supportsImage = nodeType === 'text_to_image';
   const supportsVideo = nodeType === 'text_to_video' || nodeType === 'image_to_video';
   const supportsText = nodeType === 'text_to_text' || nodeType === 'image_to_text';
-  const selectedAsset = imageAssets.find((asset) => String(asset.id) === String(modelTest.assetId));
   const resultAsset = modelResult?.asset || null;
   const resultAssetType = resultAsset?.assetType || resultAsset?.asset_type || '';
   const canPreviewImage = resultAsset?.url && ['image', 'poster', 'banner'].includes(resultAssetType);
@@ -1207,14 +1297,14 @@ function ModelTestPanel({ models, assets, modelTest, setModelTest, modelResult, 
       </label>
 
       {requiresAsset && (
-        <label>
-          图片资产
-          <select value={modelTest.assetId} onChange={(event) => update({ assetId: event.target.value })}>
-            <option value="">选择图片资产</option>
-            {imageAssets.map((asset) => <option key={asset.id} value={asset.id}>#{asset.id} {asset.title}</option>)}
-          </select>
-          {selectedAsset && <small>已选择 #{selectedAsset.id} {selectedAsset.title}</small>}
-        </label>
+        <ImageAssetPicker
+          assets={assets}
+          value={modelTest.assetId}
+          onChange={(assetId) => update({ assetId })}
+          uploadImageAsset={uploadImageAsset}
+          context="model_lab"
+          disabled={modelTesting}
+        />
       )}
 
       <section className="settings-panel">
@@ -1450,7 +1540,7 @@ function Overview({ state, summary, user, setActive, newWorkflow }) {
   );
 }
 
-function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
+function PlaygroundPanel({ api, assets, models, refresh, setMessage, uploadImageAsset }) {
   const modes = [
     ['chat', '对话', MessageSquareText, '文本生成、脚本、提示词', 'text_to_text'],
     ['multimodal_chat', '图生文', Image, '上传或选择图片后提问', 'image_to_text'],
@@ -1586,7 +1676,6 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
   }
 
   const activeSession = (sessions.items || []).find((item) => item.id === activeSessionId);
-  const imageAssets = (assets || []).filter((asset) => ['image', 'poster', 'banner'].includes(asset.asset_type || asset.assetType));
 
   return (
     <section className="playground-shell">
@@ -1695,13 +1784,14 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
           <textarea value={text} onChange={(event) => setText(event.target.value)} />
         </label>
         {(mode === 'multimodal_chat' || mode === 'image_to_video') && (
-          <label>
-            图片资产
-            <select value={assetId} onChange={(event) => setAssetId(event.target.value)}>
-              <option value="">选择图片资产</option>
-              {imageAssets.map((asset) => <option key={asset.id} value={asset.id}>#{asset.id} {asset.title}</option>)}
-            </select>
-          </label>
+          <ImageAssetPicker
+            assets={assets}
+            value={assetId}
+            onChange={setAssetId}
+            uploadImageAsset={uploadImageAsset}
+            context={`playground_${mode}`}
+            disabled={busy}
+          />
         )}
         <section className="settings-panel playground-params">
           <div className="settings-title">
