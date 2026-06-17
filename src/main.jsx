@@ -115,7 +115,6 @@ function defaultConfig(component) {
   if (component.component_key === 'vision.describe') return { question: '请描述这张图片并提炼提示词' };
   if (component.component_key === 'video.storyboard.generate') return { duration: 6, ratio: '9:16' };
   if (component.component_key === 'video.image.animate') return { duration: 6, ratio: '9:16', motion: '轻微推进镜头' };
-  if (component.component_key === 'image.resize') return { width: 1024, height: 1024 };
   if (component.component_key === 'asset.output') return { label: '最终资产' };
   return {};
 }
@@ -601,12 +600,13 @@ function App() {
     await refresh();
   }
 
-  async function recharge(amountCents) {
+  async function recharge(amountCents, channel = 'wechat', meta = {}) {
     const order = await api('/api/payments/recharge-orders', {
       method: 'POST',
-      body: JSON.stringify({ amountCents })
+      body: JSON.stringify({ amountCents, channel, ...meta })
     });
-    setMessage(`已创建待确认充值订单 #${order.id}，管理员确认收款后才会入账`);
+    const label = order.purpose === 'balance_recharge' ? '充值订单' : '单次支付订单';
+    setMessage(`已创建 ${order.channel} ${label} #${order.id}，确认收款后才会入账`);
     await refresh();
   }
 
@@ -790,7 +790,7 @@ function App() {
           </section>
         )}
 
-        {active === 'workshop' && <Workshop rows={state.workshop} api={api} refresh={refresh} setMessage={setMessage} />}
+        {active === 'workshop' && <Workshop rows={state.workshop} api={api} refresh={refresh} setMessage={setMessage} recharge={recharge} />}
 
         {active === 'billing' && (
           <BillingPanel
@@ -882,7 +882,7 @@ function Overview({ state, summary, user, setActive, newWorkflow }) {
       </div>
       <div className="grid two">
         <DataList title="最近调用" rows={summary?.recentTasks || []} fields={['id', 'status', 'workflow_title', 'cost_cents', 'created_at']} />
-        <DataList title="最近充值订单" rows={summary?.recentOrders || []} fields={['id', 'amount_cents', 'status', 'channel', 'created_at']} />
+        <DataList title="最近充值订单" rows={summary?.recentOrders || []} fields={['id', 'amount_cents', 'status', 'channel', 'purpose', 'created_at']} />
       </div>
     </section>
   );
@@ -1322,7 +1322,7 @@ function ConfigField({ field, value, onChange }) {
   );
 }
 
-function Workshop({ rows, api, refresh, setMessage }) {
+function Workshop({ rows, api, refresh, setMessage, recharge }) {
   const [filters, setFilters] = useState({ page: 1, pageSize: 9, q: '', licenseMode: 'all', sort: 'popular' });
   const [page, setPage] = useState(normalizePage(rows, 9));
   const [selected, setSelected] = useState(null);
@@ -1332,6 +1332,7 @@ function Workshop({ rows, api, refresh, setMessage }) {
   const [commentText, setCommentText] = useState('');
   const [rating, setRating] = useState(5);
   const [report, setReport] = useState({ reason: '内容违规', detail: '' });
+  const [paymentChannel, setPaymentChannel] = useState('wechat');
 
   const loadPage = useCallback(async (nextFilters = filters) => {
     const payload = await api(`/api/workshop/items?${queryFrom(nextFilters)}`);
@@ -1374,6 +1375,19 @@ function Workshop({ rows, api, refresh, setMessage }) {
     setMessage(`工坊 workflow 已真实运行：#${result.taskId}`);
     await reloadSelected(item);
     await refresh();
+  }
+
+  async function createRunPayment(item = selected) {
+    const amount = Number(estimate?.estimatedCostCents || 0);
+    if (!item?.id || amount <= 0) {
+      setMessage('当前样例无需创建支付订单');
+      return;
+    }
+    await recharge(amount, paymentChannel, {
+      purpose: 'workflow_run',
+      refType: 'workshop_item',
+      refId: Number(item.id)
+    });
   }
 
   async function clone(item = selected) {
@@ -1465,6 +1479,15 @@ function Workshop({ rows, api, refresh, setMessage }) {
             <strong>{estimate ? money(estimate.estimatedCostCents) : money(selected.price_cents || 0)} / 次</strong>
             <span>模型 {estimate ? money(estimate.modelUsageCostCents) : '-'} · workflow {estimate ? money(estimate.workflowFeeCents) : money(selected.price_cents || 0)}</span>
           </div>
+          {estimate?.estimatedCostCents > 0 && (
+            <div className="payment-inline">
+              <select value={paymentChannel} onChange={(event) => setPaymentChannel(event.target.value)}>
+                <option value="wechat">微信支付</option>
+                <option value="alipay">支付宝</option>
+              </select>
+              <button onClick={() => createRunPayment(selected)}><CreditCard size={15} /> 按预估费用支付</button>
+            </div>
+          )}
           <label>运行提示词<textarea value={runPrompt} onChange={(event) => setRunPrompt(event.target.value)} /></label>
           <div className="row-actions">
             <button className="primary" onClick={() => run(selected)}><Play size={15} /> 运行</button>
@@ -1504,6 +1527,7 @@ function Workshop({ rows, api, refresh, setMessage }) {
 
 function BillingPanel({ summary, wallet, ledgers, orders, withdraws, invite, filters, updateFilter, recharge, redeemCoupon, createWithdraw }) {
   const [customRecharge, setCustomRecharge] = useState(1000);
+  const [rechargeChannel, setRechargeChannel] = useState('wechat');
   const [couponCode, setCouponCode] = useState('');
   const [withdrawForm, setWithdrawForm] = useState({ amountCents: 100, channel: 'alipay', accountName: '', accountNo: '' });
   const rechargeOptions = [
@@ -1521,7 +1545,7 @@ function BillingPanel({ summary, wallet, ledgers, orders, withdraws, invite, fil
         </div>
         <div className="billing-actions">
           {rechargeOptions.map((option) => (
-            <button key={option.amountCents} onClick={() => recharge(option.amountCents)}><CreditCard size={15} /> 创建 {option.label} 订单</button>
+            <button key={option.amountCents} onClick={() => recharge(option.amountCents, rechargeChannel)}><CreditCard size={15} /> 创建 {option.label} 订单</button>
           ))}
         </div>
       </div>
@@ -1529,11 +1553,16 @@ function BillingPanel({ summary, wallet, ledgers, orders, withdraws, invite, fil
       <div className="billing-tools">
         <section className="panel billing-tool">
           <div className="panel-head">
-            <h2>Custom recharge</h2>
+            <h2>自定义充值</h2>
             <CreditCard size={17} />
           </div>
-          <label>Amount cents<input type="number" min="1" value={customRecharge} onChange={(event) => setCustomRecharge(Number(event.target.value || 0))} /></label>
-          <button onClick={() => recharge(customRecharge)}>Create recharge order</button>
+          <label>充值渠道<select value={rechargeChannel} onChange={(event) => setRechargeChannel(event.target.value)}>
+            <option value="wechat">微信支付</option>
+            <option value="alipay">支付宝</option>
+            <option value="manual">手动登记</option>
+          </select></label>
+          <label>金额（分）<input type="number" min="1" value={customRecharge} onChange={(event) => setCustomRecharge(Number(event.target.value || 0))} /></label>
+          <button onClick={() => recharge(customRecharge, rechargeChannel)}>创建充值订单</button>
         </section>
         <section className="panel billing-tool">
           <div className="panel-head">
@@ -1594,6 +1623,9 @@ function BillingPanel({ summary, wallet, ledgers, orders, withdraws, invite, fil
           ['amount_cents', '金额'],
           ['status', '状态'],
           ['channel', '渠道'],
+          ['purpose', '用途'],
+          ['ref_type', '关联类型'],
+          ['ref_id', '关联 ID'],
           ['external_no', '外部单号'],
           ['created_at', '创建时间']
         ]}
