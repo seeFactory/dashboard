@@ -190,12 +190,12 @@ function App() {
     assets: { ...emptyPage, pageSize: 12 }
   });
   const [filters, setFilters] = useState({
-    ledgers: { page: 1, pageSize: 10, q: '', direction: 'all' },
-    orders: { page: 1, pageSize: 10, q: '', status: 'all' },
-    withdraws: { page: 1, pageSize: 10, status: 'all' },
-    providerJobs: { page: 1, pageSize: 10, q: '', status: 'all' },
-    tasks: { page: 1, pageSize: 10, q: '', status: 'all' },
-    assets: { page: 1, pageSize: 12, q: '', assetType: 'all' }
+    ledgers: { page: 1, pageSize: 10, q: '', direction: 'all', sortBy: 'id', sortDir: 'desc' },
+    orders: { page: 1, pageSize: 10, q: '', status: 'all', sortBy: 'id', sortDir: 'desc' },
+    withdraws: { page: 1, pageSize: 10, status: 'all', sortBy: 'id', sortDir: 'desc' },
+    providerJobs: { page: 1, pageSize: 10, q: '', status: 'all', sortBy: 'id', sortDir: 'desc' },
+    tasks: { page: 1, pageSize: 10, q: '', status: 'all', sortBy: 'id', sortDir: 'desc' },
+    assets: { page: 1, pageSize: 12, q: '', assetType: 'all', sortBy: 'id', sortDir: 'desc' }
   });
   const [profileForm, setProfileForm] = useState({ email: '', displayName: '', billingPreference: 'balance_first', locale: 'zh-CN' });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' });
@@ -634,6 +634,24 @@ function App() {
     await refresh();
   }
 
+  async function batchCancelTasks(ids) {
+    const result = await api('/api/tasks/batch-cancel', {
+      method: 'POST',
+      body: JSON.stringify({ ids })
+    });
+    setMessage(`批量取消完成：${result.updated || 0} / ${result.requested || ids.length} 条已取消`);
+    await refresh();
+  }
+
+  async function batchRefreshProviderJobs(ids) {
+    const result = await api('/api/provider-jobs/batch-refresh', {
+      method: 'POST',
+      body: JSON.stringify({ ids })
+    });
+    setMessage(`批量刷新完成：${result.refreshed || 0} / ${result.requested || ids.length} 条已处理`);
+    await refresh();
+  }
+
   if (!token) {
     return (
       <main className="auth-page">
@@ -822,6 +840,8 @@ function App() {
             taskNodes={taskNodes}
             openTask={openTask}
             refreshProviderJob={refreshProviderJob}
+            batchCancelTasks={batchCancelTasks}
+            batchRefreshProviderJobs={batchRefreshProviderJobs}
           />
         )}
 
@@ -830,6 +850,7 @@ function App() {
             page={pages.assets}
             filters={filters.assets}
             updateFilter={(patch) => updateFilter('assets', patch)}
+            setMessage={setMessage}
           />
         )}
 
@@ -1717,7 +1738,7 @@ function BillingPanel({ summary, wallet, ledgers, orders, withdraws, invite, fil
   );
 }
 
-function UsagePanel({ tasks, providerJobs, filters, providerJobFilters, updateFilter, updateProviderJobFilter, activeTask, taskAsset, taskEvents, taskNodes, openTask, refreshProviderJob }) {
+function UsagePanel({ tasks, providerJobs, filters, providerJobFilters, updateFilter, updateProviderJobFilter, activeTask, taskAsset, taskEvents, taskNodes, openTask, refreshProviderJob, batchCancelTasks, batchRefreshProviderJobs }) {
   return (
     <section className="grid two usage-grid">
       <PaginatedTable
@@ -1735,6 +1756,12 @@ function UsagePanel({ tasks, providerJobs, filters, providerJobFilters, updateFi
           ['workshop_title', '工坊来源'],
           ['cost_cents', '扣费'],
           ['created_at', '创建时间']
+        ]}
+        batchActions={[
+          {
+            label: '批量取消运行中',
+            onRun: (ids) => batchCancelTasks(ids)
+          }
         ]}
         action={(row) => <button onClick={() => openTask(row.id)}>查看</button>}
       />
@@ -1755,6 +1782,12 @@ function UsagePanel({ tasks, providerJobs, filters, providerJobFilters, updateFi
           ['status', '状态'],
           ['asset_id', '资产'],
           ['updated_at', '更新时间']
+        ]}
+        batchActions={[
+          {
+            label: '批量刷新状态',
+            onRun: (ids) => batchRefreshProviderJobs(ids)
+          }
         ]}
         action={(row) => ['queued', 'running', 'waiting_callback'].includes(row.status)
           ? <button onClick={() => refreshProviderJob(row)}><RefreshCw size={15} /> 刷新</button>
@@ -1883,8 +1916,42 @@ function ProfilePanel({ user, summary, profileForm, setProfileForm, passwordForm
   );
 }
 
-function AssetGrid({ page, filters, updateFilter }) {
+function AssetGrid({ page, filters, updateFilter, setMessage }) {
   const rows = page.items || [];
+  const [selectedIds, setSelectedIds] = useState([]);
+  const selectedRows = rows.filter((row) => selectedIds.includes(row.id));
+  const allSelected = rows.length > 0 && rows.every((row) => selectedIds.includes(row.id));
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [page.page, page.pageSize, filters.q, filters.assetType, filters.sortBy, filters.sortDir]);
+
+  function toggleAsset(id) {
+    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  }
+
+  function togglePageAssets() {
+    setSelectedIds(allSelected ? [] : rows.map((row) => row.id));
+  }
+
+  async function copySelectedLinks() {
+    const text = selectedRows.map((asset) => assetUrl(asset.url)).join('\n');
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    setMessage(`已复制 ${selectedRows.length} 个资产链接`);
+  }
+
   return (
     <section className="stack">
       <div className="panel">
@@ -1904,12 +1971,38 @@ function AssetGrid({ page, filters, updateFilter }) {
               <option value="file">file</option>
             </select>
           </label>
+          <label>
+            排序
+            <select value={filters.sortBy || 'id'} onChange={(event) => updateFilter({ sortBy: event.target.value, page: 1 })}>
+              <option value="id">ID</option>
+              <option value="created_at">创建时间</option>
+              <option value="title">标题</option>
+              <option value="asset_type">类型</option>
+            </select>
+          </label>
+          <label>
+            方向
+            <select value={filters.sortDir || 'desc'} onChange={(event) => updateFilter({ sortDir: event.target.value, page: 1 })}>
+              <option value="desc">降序</option>
+              <option value="asc">升序</option>
+            </select>
+          </label>
+        </div>
+        <div className="batch-strip">
+          <button disabled={!rows.length} onClick={togglePageAssets}>{allSelected ? '取消当前页' : '选择当前页'}</button>
+          <span>已选 {selectedRows.length} 个资产</span>
+          <button disabled={!selectedRows.length} onClick={copySelectedLinks}><Link2 size={15} /> 复制链接</button>
+          <button disabled={!selectedRows.length} onClick={() => setSelectedIds([])}>清空</button>
         </div>
       </div>
       <section className="asset-grid">
       {!rows.length && <div className="panel empty-table">资产库为空。运行 workflow 后会出现真实产物。</div>}
       {rows.map((asset) => (
-        <article className="panel asset-card" key={asset.id}>
+        <article className={`panel asset-card ${selectedIds.includes(asset.id) ? 'selected' : ''}`} key={asset.id}>
+          <label className="asset-check">
+            <input type="checkbox" checked={selectedIds.includes(asset.id)} onChange={() => toggleAsset(asset.id)} />
+            选择
+          </label>
           {asset.asset_type !== 'video' && <img src={assetUrl(asset.url)} alt={asset.title} />}
           <div>
             <strong>{asset.title}</strong>
@@ -1924,7 +2017,36 @@ function AssetGrid({ page, filters, updateFilter }) {
   );
 }
 
-function PaginatedTable({ title, icon, page, filters, onFilter, columns, action, statusOptions, directionOptions, searchPlaceholder }) {
+function PaginatedTable({ title, icon, page, filters, onFilter, columns, action, statusOptions, directionOptions, searchPlaceholder, batchActions = [] }) {
+  const [selectedIds, setSelectedIds] = useState([]);
+  const rows = page.items || [];
+  const selectable = batchActions.length > 0;
+  const rowIds = rows.map((row) => row.id).filter(Boolean);
+  const selectedRows = rows.filter((row) => selectedIds.includes(row.id));
+  const allSelected = rowIds.length > 0 && rowIds.every((id) => selectedIds.includes(id));
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [page.page, page.pageSize, filters.q, filters.status, filters.direction, filters.sortBy, filters.sortDir]);
+
+  function toggleRow(id) {
+    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  }
+
+  function togglePage() {
+    setSelectedIds(allSelected ? [] : rowIds);
+  }
+
+  function sortBy(key) {
+    const nextDir = filters.sortBy === key && filters.sortDir === 'desc' ? 'asc' : 'desc';
+    onFilter({ sortBy: key, sortDir: nextDir, page: 1 });
+  }
+
+  async function runBatch(actionItem) {
+    await actionItem.onRun(selectedIds, selectedRows);
+    setSelectedIds([]);
+  }
+
   return (
     <section className="panel data-list paginated">
       <div className="panel-head">
@@ -1962,16 +2084,43 @@ function PaginatedTable({ title, icon, page, filters, onFilter, columns, action,
           </select>
         </label>
       </div>
+      {selectable && (
+        <div className="batch-strip">
+          <button disabled={!rowIds.length} onClick={togglePage}>{allSelected ? '取消当前页' : '选择当前页'}</button>
+          <span>已选 {selectedIds.length} 条</span>
+          {batchActions.map((item) => (
+            <button key={item.label} disabled={!selectedIds.length} onClick={() => runBatch(item)}>{item.label}</button>
+          ))}
+          <button disabled={!selectedIds.length} onClick={() => setSelectedIds([])}>清空</button>
+        </div>
+      )}
       {!page.items.length ? (
         <div className="empty-table">暂无数据</div>
       ) : (
         <div className="table">
-          <div className="tr head" style={{ '--cols': columns.length + (action ? 1 : 0) }}>
-            {columns.map(([, label]) => <span key={label}>{label}</span>)}
+          <div className="tr head" style={{ '--cols': columns.length + (action ? 1 : 0) + (selectable ? 1 : 0) }}>
+            {selectable && (
+              <span className="check-cell">
+                <input type="checkbox" checked={allSelected} onChange={togglePage} aria-label="选择当前页" />
+              </span>
+            )}
+            {columns.map(([key, label]) => (
+              <span key={label}>
+                <button className={`sort-link ${filters.sortBy === key ? 'active' : ''}`} onClick={() => sortBy(key)}>
+                  {label}
+                  {filters.sortBy === key && <small>{filters.sortDir === 'asc' ? '↑' : '↓'}</small>}
+                </button>
+              </span>
+            ))}
             {action && <span>操作</span>}
           </div>
           {page.items.map((row) => (
-            <div className="tr" key={row.id} style={{ '--cols': columns.length + (action ? 1 : 0) }}>
+            <div className="tr" key={row.id} style={{ '--cols': columns.length + (action ? 1 : 0) + (selectable ? 1 : 0) }}>
+              {selectable && (
+                <span className="check-cell">
+                  <input type="checkbox" checked={selectedIds.includes(row.id)} onChange={() => toggleRow(row.id)} aria-label={`选择 ${row.id}`} />
+                </span>
+              )}
               {columns.map(([key]) => <span key={key} title={formatValue(key, row[key])}>{formatValue(key, row[key])}</span>)}
               {action && <span>{action(row)}</span>}
             </div>

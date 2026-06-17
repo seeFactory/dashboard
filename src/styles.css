@@ -857,6 +857,28 @@ small,
   overflow-x: auto;
 }
 
+.batch-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-2) 72%, var(--surface));
+}
+
+.batch-strip span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.batch-strip button {
+  min-height: 36px;
+  padding: 0 13px;
+}
+
 .tr {
   min-width: 760px;
   display: grid;
@@ -874,10 +896,49 @@ small,
   white-space: nowrap;
 }
 
+.tr .check-cell {
+  min-width: 64px;
+  max-width: 72px;
+  justify-content: center;
+}
+
+.check-cell input[type="checkbox"],
+.asset-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  border-radius: 6px;
+}
+
 .tr.head {
   color: var(--muted);
   font-size: 12px;
   text-transform: uppercase;
+}
+
+.sort-link {
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 800;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 5px;
+}
+
+.sort-link:hover:not(:disabled),
+.sort-link.active {
+  color: var(--accent);
+  border-color: transparent;
+}
+
+.sort-link small {
+  font-size: 12px;
 }
 
 .empty-table {
@@ -1150,6 +1211,21 @@ small,
 .asset-card {
   display: grid;
   gap: 12px;
+}
+
+.asset-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent), var(--shadow);
+}
+
+.asset-check {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
 }
 
 .asset-card img {
