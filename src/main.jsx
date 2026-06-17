@@ -16,6 +16,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import {
   Activity,
+  AlertCircle,
   BarChart3,
   CheckCircle2,
   ChevronLeft,
@@ -26,9 +27,11 @@ import {
   FileJson,
   FlaskConical,
   Image,
+  Info,
   KeyRound,
   LayoutDashboard,
   Link2,
+  Loader2,
   LogOut,
   MessageSquareText,
   Moon,
@@ -40,7 +43,9 @@ import {
   ReceiptText,
   Save,
   Search,
+  Settings2,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   Sun,
   Trash2,
@@ -48,6 +53,8 @@ import {
   UserPlus,
   UserRound,
   Video,
+  X,
+  XCircle,
   Workflow
 } from 'lucide-react';
 import './styles.css';
@@ -69,6 +76,43 @@ const tabs = [
 const emptyGraph = { schemaVersion: '1.0', nodes: [], edges: [] };
 const emptyPage = { items: [], page: 1, pageSize: 10, total: 0, totalPages: 1 };
 const nodeTypes = { sfNode: WorkflowNode };
+const aspectRatioOptions = ['1:1', '4:5', '3:4', '16:9', '9:16', '21:9'];
+const imageSizePresets = [
+  { label: '方图 1024', value: '1024x1024', width: 1024, height: 1024, ratio: '1:1' },
+  { label: '竖图 1024x1792', value: '1024x1792', width: 1024, height: 1792, ratio: '9:16' },
+  { label: '横图 1792x1024', value: '1792x1024', width: 1792, height: 1024, ratio: '16:9' },
+  { label: '社媒 1080x1350', value: '1080x1350', width: 1080, height: 1350, ratio: '4:5' },
+  { label: '短剧封面 1440x2560', value: '1440x2560', width: 1440, height: 2560, ratio: '9:16' }
+];
+const videoResolutionOptions = ['540p', '720p', '1080p', '2K'];
+const videoDurationOptions = [4, 6, 8, 10, 15];
+
+const defaultModelTest = {
+  modelKey: '',
+  prompt: '生成一张极简产品宣传图',
+  title: 'seeFactory',
+  assetId: '',
+  ratio: '16:9',
+  size: '1792x1024',
+  width: 1792,
+  height: 1024,
+  quality: 'standard',
+  style: 'natural',
+  background: 'auto',
+  outputFormat: 'url',
+  palette: 'sage',
+  seed: '',
+  negativePrompt: '',
+  resolution: '720p',
+  duration: 6,
+  fps: 24,
+  motionStrength: 'medium',
+  cameraMotion: 'slow_push',
+  motion: '轻微推进镜头，主体自然运动',
+  systemPrompt: '',
+  temperature: 0.7,
+  maxTokens: 800
+};
 
 function money(cents = 0) {
   return `¥${(Number(cents) / 100).toFixed(2)}`;
@@ -77,6 +121,84 @@ function money(cents = 0) {
 function assetUrl(url) {
   if (!url) return '';
   return url.startsWith('http') ? url : `${API_BASE}${url}`;
+}
+
+function noticeText(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return value.message || value.title || String(value);
+}
+
+function inferNoticeType(text, fallback = 'info') {
+  const content = String(text || '');
+  if (!content) return fallback;
+  if (/失败|错误|异常|不足|下线|不可用|未授权|401|403|404|500|超时/.test(content)) return 'error';
+  if (/成功|完成|已创建|已保存|已发布|已导入|已提交|通过/.test(content)) return 'success';
+  if (/请先|等待|需要|暂无|校验/.test(content)) return 'warning';
+  return fallback;
+}
+
+function modelNodeType(model) {
+  const schemaType = model?.schema?.nodeType;
+  if (schemaType) return schemaType;
+  if (model?.modality === 'image') return 'text_to_image';
+  if (model?.modality === 'video') return 'text_to_video';
+  return 'text_to_text';
+}
+
+function nodeTypeLabel(type) {
+  const labels = {
+    text_to_text: '文生文',
+    image_to_text: '图生文',
+    text_to_image: '文生图',
+    text_to_video: '文生视频',
+    image_to_video: '图生视频'
+  };
+  return labels[type] || type || '模型';
+}
+
+function compactJson(value) {
+  return JSON.stringify(value, null, 2);
+}
+
+function buildModelTestPayload(test, model) {
+  const seed = test.seed === '' || test.seed === undefined ? undefined : Number(test.seed);
+  const params = {
+    title: test.title,
+    palette: test.palette,
+    ratio: test.ratio,
+    aspectRatio: test.ratio,
+    size: test.size,
+    width: Number(test.width) || undefined,
+    height: Number(test.height) || undefined,
+    quality: test.quality,
+    style: test.style,
+    background: test.background,
+    outputFormat: test.outputFormat,
+    seed,
+    negativePrompt: test.negativePrompt,
+    resolution: test.resolution,
+    duration: Number(test.duration) || undefined,
+    fps: Number(test.fps) || undefined,
+    motionStrength: test.motionStrength,
+    cameraMotion: test.cameraMotion,
+    motion: test.motion,
+    systemPrompt: test.systemPrompt,
+    temperature: Number(test.temperature),
+    maxTokens: Number(test.maxTokens) || undefined,
+    nodeType: modelNodeType(model)
+  };
+  Object.keys(params).forEach((key) => {
+    if (params[key] === '' || params[key] === undefined || Number.isNaN(params[key])) delete params[key];
+  });
+  return {
+    modelKey: test.modelKey,
+    prompt: test.prompt,
+    title: test.title,
+    palette: test.palette,
+    assetId: test.assetId ? Number(test.assetId) : undefined,
+    params
+  };
 }
 
 function normalizePage(payload, pageSize = 10) {
@@ -177,7 +299,10 @@ function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('sf-theme') || 'light');
   const [active, setActive] = useState('overview');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [notice, setNotice] = useState({ text: '', type: 'info' });
+  const [toasts, setToasts] = useState([]);
+  const [dialog, setDialog] = useState(null);
+  const message = notice.text;
   const [authMode, setAuthMode] = useState('login');
   const [form, setForm] = useState({ email: '', password: '', displayName: '', inviteCode: '' });
   const [summary, setSummary] = useState(null);
@@ -224,8 +349,10 @@ function App() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [runInput, setRunInput] = useState('为 seeFactory 生成一张极简风格产品海报');
-  const [modelTest, setModelTest] = useState({ modelKey: '', prompt: '生成一张极简产品宣传图', title: 'seeFactory' });
+  const [modelTest, setModelTest] = useState(defaultModelTest);
   const [modelResult, setModelResult] = useState(null);
+  const [modelTesting, setModelTesting] = useState(false);
+  const [modelRunStage, setModelRunStage] = useState('');
   const [activeTask, setActiveTask] = useState(null);
   const [taskEvents, setTaskEvents] = useState([]);
   const [taskNodes, setTaskNodes] = useState([]);
@@ -241,20 +368,65 @@ function App() {
     localStorage.setItem('sf-theme', theme);
   }, [theme]);
 
+  const closeToast = useCallback((id) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }, []);
+
+  const setMessage = useCallback((value, explicitType = '') => {
+    const text = noticeText(value);
+    if (!text) {
+      setNotice({ text: '', type: 'info' });
+      return;
+    }
+    const type = explicitType || inferNoticeType(text);
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setNotice({ text, type });
+    setToasts((current) => [...current.slice(-3), { id, text, type }]);
+    window.setTimeout(() => closeToast(id), type === 'error' ? 7200 : 4400);
+  }, [closeToast]);
+
+  const openDialog = useCallback((payload) => {
+    setDialog(payload);
+  }, []);
+
+  const closeDialog = useCallback(() => {
+    setDialog(null);
+  }, []);
+
   const api = useCallback(async (path, options = {}) => {
-    const response = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers: {
-        'content-type': 'application/json',
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-        ...(options.headers || {})
-      }
-    });
+    let response;
+    try {
+      response = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers: {
+          'content-type': 'application/json',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+          ...(options.headers || {})
+        }
+      });
+    } catch (error) {
+      const nextError = new Error(`网络请求失败，请检查服务是否可访问：${error.message}`);
+      nextError.status = 0;
+      setMessage(nextError, 'error');
+      throw nextError;
+    }
     const text = await response.text();
-    const body = text ? JSON.parse(text) : null;
-    if (!response.ok) throw new Error(body?.message || text || `HTTP ${response.status}`);
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = { message: text };
+    }
+    if (!response.ok) {
+      const error = new Error(body?.message || text || `HTTP ${response.status}`);
+      error.status = response.status;
+      error.issues = body?.issues || null;
+      error.payload = body;
+      setMessage(error, 'error');
+      throw error;
+    }
     return body;
-  }, [token]);
+  }, [setMessage, token]);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -594,10 +766,47 @@ function App() {
   }
 
   async function runModelTest() {
-    if (!modelTest.modelKey) return;
-    const result = await api('/api/models/test', { method: 'POST', body: JSON.stringify(modelTest) });
-    setModelResult(result);
-    await refresh();
+    const model = state.models.find((item) => item.model_key === modelTest.modelKey);
+    const nodeType = modelNodeType(model);
+    if (!modelTest.modelKey) {
+      setMessage('请先选择一个可用模型', 'warning');
+      return;
+    }
+    if (!modelTest.prompt.trim()) {
+      setMessage('请输入测试提示词', 'warning');
+      return;
+    }
+    if ((nodeType === 'image_to_text' || nodeType === 'image_to_video') && !modelTest.assetId) {
+      setMessage(`${nodeTypeLabel(nodeType)} 需要先选择一张图片资产`, 'warning');
+      return;
+    }
+    setModelTesting(true);
+    setModelResult(null);
+    setModelRunStage('正在提交模型请求');
+    const waitingTimer = window.setTimeout(() => setModelRunStage('模型正在生成，等待上游响应'), 900);
+    const longTimer = window.setTimeout(() => setModelRunStage('任务仍在处理，视频或高分辨率图片可能需要更久'), 9000);
+    try {
+      const result = await api('/api/models/test', {
+        method: 'POST',
+        body: JSON.stringify(buildModelTestPayload(modelTest, model))
+      });
+      setModelRunStage('正在写入资产与响应');
+      setModelResult(result);
+      setMessage(`模型测试完成：${nodeTypeLabel(result.nodeType || nodeType)}，预估消耗 ${money(result.costCents || 0)}`, 'success');
+      await refresh();
+    } catch (error) {
+      openDialog({
+        tone: 'error',
+        title: '模型测试失败',
+        body: error.message || '模型测试请求失败',
+        detail: error.issues ? compactJson(error.issues) : compactJson(error.payload || { status: error.status })
+      });
+    } finally {
+      window.clearTimeout(waitingTimer);
+      window.clearTimeout(longTimer);
+      setModelTesting(false);
+      setModelRunStage('');
+    }
   }
 
   async function recharge(amountCents, channel = 'wechat', meta = {}) {
@@ -654,39 +863,44 @@ function App() {
 
   if (!token) {
     return (
-      <main className="auth-page">
-        <form className="auth-card" onSubmit={submitAuth}>
-          <img src="/brand/logo-icon.png" alt="seeFactory" />
-          <h1>seeFactory 控制台</h1>
-          <p>注册账号后即可创建真实 workflow，运行结果会写入任务与资产库。</p>
-          <div className="segmented">
-            <button type="button" className={authMode === 'login' ? 'active' : ''} onClick={() => setAuthMode('login')}>登录</button>
-            <button type="button" className={authMode === 'register' ? 'active' : ''} onClick={() => setAuthMode('register')}><UserPlus size={15} /> 注册</button>
-          </div>
-          {authMode === 'register' && (
+      <>
+        <main className="auth-page">
+          <form className="auth-card" onSubmit={submitAuth}>
+            <img src="/brand/logo-icon.png" alt="seeFactory" />
+            <h1>seeFactory 控制台</h1>
+            <p>注册账号后即可创建真实 workflow，运行结果会写入任务与资产库。</p>
+            <div className="segmented">
+              <button type="button" className={authMode === 'login' ? 'active' : ''} onClick={() => setAuthMode('login')}>登录</button>
+              <button type="button" className={authMode === 'register' ? 'active' : ''} onClick={() => setAuthMode('register')}><UserPlus size={15} /> 注册</button>
+            </div>
+            {authMode === 'register' && (
+              <label>
+                昵称
+                <input value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="创作者名称" />
+              </label>
+            )}
             <label>
-              昵称
-              <input value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="创作者名称" />
+              邮箱
+              <input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@example.com" />
             </label>
-          )}
-          <label>
-            邮箱
-            <input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@example.com" />
-          </label>
-          <label>
-            密码
-            <input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder="至少 8 位" />
-          </label>
-          <button className="primary" disabled={loading}>{authMode === 'register' ? '创建账号' : '登录'}</button>
-          {message && <div className="notice">{message}</div>}
-        </form>
-      </main>
+            <label>
+              密码
+              <input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder="至少 8 位" />
+            </label>
+            <button className="primary" disabled={loading}>{authMode === 'register' ? '创建账号' : '登录'}</button>
+            {message && <div className={`notice ${notice.type}`}>{message}</div>}
+          </form>
+        </main>
+        <ToastStack toasts={toasts} onClose={closeToast} />
+        <AppDialog dialog={dialog} onClose={closeDialog} />
+      </>
     );
   }
 
   const taskAsset = extractTaskAsset(activeTask);
 
   return (
+    <>
     <main className="shell">
       <aside className="sidebar">
         <a className="brand" href="/">
@@ -729,7 +943,7 @@ function App() {
           </div>
         </header>
 
-        {message && <div className="notice">{message}</div>}
+        {notice.text && <div className={`notice ${notice.type}`}>{notice.text}</div>}
         {loading && <div className="notice muted">正在同步平台真实数据...</div>}
 
         {active === 'overview' && <Overview state={state} summary={summary} user={user} setActive={setActive} newWorkflow={newWorkflow} />}
@@ -779,31 +993,18 @@ function App() {
         )}
 
         {active === 'models' && (
-          <section className="grid two">
-            <div className="panel">
-              <h2>模型测试台</h2>
-              <label>
-                模型
-                <select value={modelTest.modelKey} onChange={(event) => setModelTest({ ...modelTest, modelKey: event.target.value })}>
-                  {state.models.map((model) => <option key={model.model_key} value={model.model_key}>{model.name}</option>)}
-                </select>
-              </label>
-              <label>
-                标题
-                <input value={modelTest.title} onChange={(event) => setModelTest({ ...modelTest, title: event.target.value })} />
-              </label>
-              <label>
-                提示词
-                <textarea value={modelTest.prompt} onChange={(event) => setModelTest({ ...modelTest, prompt: event.target.value })} />
-              </label>
-              <button className="primary" onClick={runModelTest}><Play size={16} /> 真实测试</button>
-              {modelResult?.asset && (
-                <figure className="asset-preview">
-                  <img src={assetUrl(modelResult.asset.url)} alt={modelResult.asset.title} />
-                  <figcaption>{modelResult.asset.title}</figcaption>
-                </figure>
-              )}
-            </div>
+          <section className="model-lab-layout">
+            <ModelTestPanel
+              models={state.models}
+              assets={state.assets}
+              modelTest={modelTest}
+              setModelTest={setModelTest}
+              modelResult={modelResult}
+              modelTesting={modelTesting}
+              modelRunStage={modelRunStage}
+              runModelTest={runModelTest}
+              openDialog={openDialog}
+            />
             <DataList title="模型池" rows={state.models} fields={['name', 'modality', 'provider', 'price_cents', 'status']} />
           </section>
         )}
@@ -868,6 +1069,322 @@ function App() {
         )}
       </section>
     </main>
+    <ToastStack toasts={toasts} onClose={closeToast} />
+    <AppDialog dialog={dialog} onClose={closeDialog} />
+    </>
+  );
+}
+
+function ToastStack({ toasts, onClose }) {
+  const icons = {
+    success: CheckCircle2,
+    error: XCircle,
+    warning: AlertCircle,
+    info: Info
+  };
+  return (
+    <div className="toast-stack" role="status" aria-live="polite">
+      {toasts.map((toast) => {
+        const Icon = icons[toast.type] || Info;
+        return (
+          <article key={toast.id} className={`toast ${toast.type}`}>
+            <Icon size={18} />
+            <p>{toast.text}</p>
+            <button type="button" aria-label="关闭提示" onClick={() => onClose(toast.id)}><X size={15} /></button>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function AppDialog({ dialog, onClose }) {
+  if (!dialog) return null;
+  const Icon = dialog.tone === 'error' ? XCircle : dialog.tone === 'success' ? CheckCircle2 : Info;
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      <section className={`app-modal ${dialog.tone || 'info'}`} role="dialog" aria-modal="true" aria-label={dialog.title}>
+        <div className="modal-head">
+          <span className="modal-icon"><Icon size={20} /></span>
+          <div>
+            <h2>{dialog.title}</h2>
+            {dialog.body && <p>{dialog.body}</p>}
+          </div>
+          <button type="button" aria-label="关闭弹窗" onClick={onClose}><X size={16} /></button>
+        </div>
+        {dialog.detail && <pre className="modal-detail">{dialog.detail}</pre>}
+        <div className="modal-actions">
+          <button className="primary" onClick={onClose}>知道了</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ModelTestPanel({ models, assets, modelTest, setModelTest, modelResult, modelTesting, modelRunStage, runModelTest, openDialog }) {
+  const selectedModel = (models || []).find((model) => model.model_key === modelTest.modelKey) || null;
+  const nodeType = modelNodeType(selectedModel);
+  const imageAssets = (assets || []).filter((asset) => ['image', 'poster', 'banner'].includes(asset.asset_type || asset.assetType));
+  const requiresAsset = nodeType === 'image_to_text' || nodeType === 'image_to_video';
+  const supportsImage = nodeType === 'text_to_image';
+  const supportsVideo = nodeType === 'text_to_video' || nodeType === 'image_to_video';
+  const supportsText = nodeType === 'text_to_text' || nodeType === 'image_to_text';
+  const selectedAsset = imageAssets.find((asset) => String(asset.id) === String(modelTest.assetId));
+  const resultAsset = modelResult?.asset || null;
+  const resultAssetType = resultAsset?.assetType || resultAsset?.asset_type || '';
+  const canPreviewImage = resultAsset?.url && ['image', 'poster', 'banner'].includes(resultAssetType);
+
+  function update(patch) {
+    setModelTest((current) => ({ ...current, ...patch }));
+  }
+
+  function applySizePreset(value) {
+    const preset = imageSizePresets.find((item) => item.value === value);
+    if (!preset) {
+      update({ size: value });
+      return;
+    }
+    update({ size: preset.value, width: preset.width, height: preset.height, ratio: preset.ratio });
+  }
+
+  return (
+    <div className="panel model-lab">
+      <div className="panel-head">
+        <div>
+          <span className="eyebrow">Model Lab</span>
+          <h2><FlaskConical size={20} /> 模型测试台</h2>
+        </div>
+        <span className="pill">{selectedModel ? nodeTypeLabel(nodeType) : '等待模型'}</span>
+      </div>
+
+      <div className="model-lab-grid">
+        <label>
+          模型
+          <select value={modelTest.modelKey} onChange={(event) => update({ modelKey: event.target.value })}>
+            {!models?.length && <option value="">暂无上线模型</option>}
+            {(models || []).map((model) => (
+              <option key={model.model_key} value={model.model_key}>
+                {model.name} · {nodeTypeLabel(modelNodeType(model))} · {money(model.price_cents)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          输出标题
+          <input value={modelTest.title} onChange={(event) => update({ title: event.target.value })} placeholder="资产标题" />
+        </label>
+      </div>
+
+      <label>
+        提示词
+        <textarea value={modelTest.prompt} onChange={(event) => update({ prompt: event.target.value })} placeholder="描述你要生成、分析或改写的内容" />
+      </label>
+
+      {requiresAsset && (
+        <label>
+          图片资产
+          <select value={modelTest.assetId} onChange={(event) => update({ assetId: event.target.value })}>
+            <option value="">选择图片资产</option>
+            {imageAssets.map((asset) => <option key={asset.id} value={asset.id}>#{asset.id} {asset.title}</option>)}
+          </select>
+          {selectedAsset && <small>已选择 #{selectedAsset.id} {selectedAsset.title}</small>}
+        </label>
+      )}
+
+      <section className="settings-panel">
+        <div className="settings-title">
+          <SlidersHorizontal size={17} />
+          <strong>测试参数</strong>
+          <span>{nodeTypeLabel(nodeType)}</span>
+        </div>
+
+        {supportsImage && (
+          <div className="settings-grid">
+            <label>
+              尺寸预设
+              <select value={modelTest.size} onChange={(event) => applySizePreset(event.target.value)}>
+                {imageSizePresets.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
+              </select>
+            </label>
+            <label>
+              画幅
+              <select value={modelTest.ratio} onChange={(event) => update({ ratio: event.target.value })}>
+                {aspectRatioOptions.map((ratio) => <option key={ratio} value={ratio}>{ratio}</option>)}
+              </select>
+            </label>
+            <label>
+              宽度
+              <input type="number" min="512" max="4096" step="64" value={modelTest.width} onChange={(event) => update({ width: Number(event.target.value), size: `${event.target.value}x${modelTest.height}` })} />
+            </label>
+            <label>
+              高度
+              <input type="number" min="512" max="4096" step="64" value={modelTest.height} onChange={(event) => update({ height: Number(event.target.value), size: `${modelTest.width}x${event.target.value}` })} />
+            </label>
+            <label>
+              质量
+              <select value={modelTest.quality} onChange={(event) => update({ quality: event.target.value })}>
+                <option value="auto">自动</option>
+                <option value="standard">标准</option>
+                <option value="high">高质量</option>
+              </select>
+            </label>
+            <label>
+              风格
+              <select value={modelTest.style} onChange={(event) => update({ style: event.target.value })}>
+                <option value="natural">自然</option>
+                <option value="vivid">鲜明</option>
+                <option value="cinematic">电影感</option>
+                <option value="product">产品图</option>
+              </select>
+            </label>
+            <label>
+              背景
+              <select value={modelTest.background} onChange={(event) => update({ background: event.target.value })}>
+                <option value="auto">自动</option>
+                <option value="transparent">透明</option>
+                <option value="opaque">不透明</option>
+              </select>
+            </label>
+            <label>
+              输出格式
+              <select value={modelTest.outputFormat} onChange={(event) => update({ outputFormat: event.target.value })}>
+                <option value="url">URL</option>
+                <option value="png">PNG</option>
+                <option value="jpeg">JPEG</option>
+                <option value="webp">WebP</option>
+              </select>
+            </label>
+          </div>
+        )}
+
+        {supportsVideo && (
+          <div className="settings-grid">
+            <label>
+              画幅
+              <select value={modelTest.ratio} onChange={(event) => update({ ratio: event.target.value })}>
+                {aspectRatioOptions.map((ratio) => <option key={ratio} value={ratio}>{ratio}</option>)}
+              </select>
+            </label>
+            <label>
+              分辨率
+              <select value={modelTest.resolution} onChange={(event) => update({ resolution: event.target.value })}>
+                {videoResolutionOptions.map((resolution) => <option key={resolution} value={resolution}>{resolution}</option>)}
+              </select>
+            </label>
+            <label>
+              时长
+              <select value={modelTest.duration} onChange={(event) => update({ duration: Number(event.target.value) })}>
+                {videoDurationOptions.map((duration) => <option key={duration} value={duration}>{duration} 秒</option>)}
+              </select>
+            </label>
+            <label>
+              帧率
+              <input type="number" min="12" max="60" value={modelTest.fps} onChange={(event) => update({ fps: Number(event.target.value) })} />
+            </label>
+            <label>
+              运动强度
+              <select value={modelTest.motionStrength} onChange={(event) => update({ motionStrength: event.target.value })}>
+                <option value="low">轻微</option>
+                <option value="medium">适中</option>
+                <option value="high">强烈</option>
+              </select>
+            </label>
+            <label>
+              镜头运动
+              <select value={modelTest.cameraMotion} onChange={(event) => update({ cameraMotion: event.target.value })}>
+                <option value="static">固定镜头</option>
+                <option value="slow_push">慢推</option>
+                <option value="pan">横移</option>
+                <option value="orbit">环绕</option>
+              </select>
+            </label>
+          </div>
+        )}
+
+        {supportsText && (
+          <div className="settings-grid">
+            <label>
+              温度
+              <input type="number" min="0" max="2" step="0.1" value={modelTest.temperature} onChange={(event) => update({ temperature: Number(event.target.value) })} />
+            </label>
+            <label>
+              最大 token
+              <input type="number" min="128" max="8192" step="128" value={modelTest.maxTokens} onChange={(event) => update({ maxTokens: Number(event.target.value) })} />
+            </label>
+            <label className="span-two">
+              系统提示词
+              <input value={modelTest.systemPrompt} onChange={(event) => update({ systemPrompt: event.target.value })} placeholder="可选" />
+            </label>
+          </div>
+        )}
+
+        {(supportsImage || supportsVideo) && (
+          <div className="settings-grid">
+            <label>
+              Seed
+              <input value={modelTest.seed} onChange={(event) => update({ seed: event.target.value })} placeholder="可选，便于复现" />
+            </label>
+            <label className="span-two">
+              负面词
+              <input value={modelTest.negativePrompt} onChange={(event) => update({ negativePrompt: event.target.value })} placeholder="不要出现的元素、风格或缺陷" />
+            </label>
+            <label className="span-two">
+              运动说明
+              <input value={modelTest.motion} onChange={(event) => update({ motion: event.target.value })} placeholder="视频模型可用" />
+            </label>
+          </div>
+        )}
+      </section>
+
+      <button className="primary wide model-run-button" disabled={modelTesting || !modelTest.modelKey} onClick={runModelTest}>
+        {modelTesting ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
+        {modelTesting ? '等待模型响应' : '真实测试'}
+      </button>
+
+      {modelTesting && (
+        <div className="running-card">
+          <Loader2 className="spin" size={18} />
+          <div>
+            <strong>{modelRunStage || '正在运行模型'}</strong>
+            <p>当前请求已提交，请等待模型返回结果。</p>
+          </div>
+          <span className="progress-line" />
+        </div>
+      )}
+
+      {modelResult && (
+        <section className="model-result-card">
+          <div className="settings-title">
+            <CheckCircle2 size={17} />
+            <strong>测试结果</strong>
+            <span>{money(modelResult.costCents || 0)}</span>
+          </div>
+          {modelResult.text && <pre>{modelResult.text}</pre>}
+          {resultAsset && (
+            <figure className="asset-preview">
+              {canPreviewImage ? (
+                <img src={assetUrl(resultAsset.url)} alt={resultAsset.title} />
+              ) : (
+                <a className="asset-file-link" href={assetUrl(resultAsset.url)} target="_blank" rel="noreferrer">
+                  <Video size={18} /> 打开生成资产
+                </a>
+              )}
+              <figcaption>#{resultAsset.id} {resultAsset.title}</figcaption>
+            </figure>
+          )}
+          {modelResult.providerJob && <p className="muted-text">上游任务 #{modelResult.providerJob.id} · {modelResult.providerJob.status}</p>}
+          <button type="button" onClick={() => openDialog({
+            title: '模型测试响应',
+            body: `${modelResult.modelKey} / ${nodeTypeLabel(modelResult.nodeType || nodeType)}`,
+            detail: compactJson(modelResult)
+          })}>
+            <Settings2 size={15} /> 查看响应详情
+          </button>
+        </section>
+      )}
+    </div>
   );
 }
 
@@ -1175,8 +1692,18 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
           ))}
           {!modelsForMode.length && <span>等待管理员配置该模式的模型能力</span>}
         </div>
+        {busy && (
+          <div className="running-card compact">
+            <Loader2 className="spin" size={18} />
+            <div>
+              <strong>正在等待模型响应</strong>
+              <p>操练结果会保存到当前 session。</p>
+            </div>
+            <span className="progress-line" />
+          </div>
+        )}
         <button className="primary wide" disabled={busy || !activeSessionId || !selectedModel} onClick={runPlayground}>
-          <Play size={16} /> {busy ? '运行中' : '运行操练'}
+          {busy ? <Loader2 className="spin" size={16} /> : <Play size={16} />} {busy ? '等待响应' : '运行操练'}
         </button>
       </aside>
     </section>
