@@ -890,21 +890,39 @@ function Overview({ state, summary, user, setActive, newWorkflow }) {
 
 function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
   const modes = [
-    ['chat', '对话', MessageSquareText, '文本生成、脚本、提示词'],
-    ['multimodal_chat', '图生文', Image, '上传或选择图片后提问'],
-    ['text_to_image', '生图', Sparkles, 'Prompt 生成图片资产'],
-    ['text_to_video', '生视频', Video, 'Prompt 生成视频任务'],
-    ['image_to_video', '图生视频', Play, '首帧图片生成视频任务']
+    ['chat', '对话', MessageSquareText, '文本生成、脚本、提示词', 'text_to_text'],
+    ['multimodal_chat', '图生文', Image, '上传或选择图片后提问', 'image_to_text'],
+    ['text_to_image', '生图', Sparkles, 'Prompt 生成图片资产', 'text_to_image'],
+    ['text_to_video', '生视频', Video, 'Prompt 生成视频任务', 'text_to_video'],
+    ['image_to_video', '图生视频', Play, '首帧图片生成视频任务', 'image_to_video']
   ];
   const [sessions, setSessions] = useState(emptyPage);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [mode, setMode] = useState('chat');
+  const [selectedModel, setSelectedModel] = useState('');
   const [text, setText] = useState('为一个 AI 短剧镜头设计画面和动作');
   const [assetId, setAssetId] = useState('');
   const [params, setParams] = useState({ title: 'seeFactory 操练场', palette: 'sage', duration: 6, ratio: '9:16' });
   const [busy, setBusy] = useState(false);
   const [lastRun, setLastRun] = useState(null);
+  const currentMode = modes.find(([key]) => key === mode) || modes[0];
+  const currentNodeType = currentMode[4];
+  const modelsForMode = useMemo(
+    () => (models || []).filter((model) => model.schema?.nodeType === currentNodeType),
+    [models, currentNodeType]
+  );
+  const selectedModelRow = modelsForMode.find((model) => model.model_key === selectedModel) || null;
+
+  useEffect(() => {
+    if (!modelsForMode.length) {
+      setSelectedModel('');
+      return;
+    }
+    if (!modelsForMode.some((model) => model.model_key === selectedModel)) {
+      setSelectedModel(modelsForMode[0].model_key);
+    }
+  }, [modelsForMode, selectedModel]);
 
   async function loadSessions(nextActiveId = activeSessionId) {
     const page = await api('/api/playground/sessions?pageSize=30');
@@ -953,6 +971,10 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
     if (!activeSessionId) return;
     setBusy(true);
     try {
+      if (!selectedModel) {
+        setMessage('当前模式没有可用模型，请先让管理员配置并上线模型能力');
+        return;
+      }
       const needsAsset = mode === 'multimodal_chat' || mode === 'image_to_video';
       if (needsAsset && !assetId) {
         setMessage('当前模式需要先选择一个图片资产');
@@ -966,7 +988,7 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
       };
       const result = await api(`/api/playground/sessions/${activeSessionId}/run`, {
         method: 'POST',
-        body: JSON.stringify({ mode, input, params })
+        body: JSON.stringify({ mode, capabilityKey: selectedModel, input, params })
       });
       setLastRun(result);
       setMessage(`操练场运行完成，消耗 ${money(result.billing?.actualCostCents || 0)}`);
@@ -979,9 +1001,6 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
 
   const activeSession = (sessions.items || []).find((item) => item.id === activeSessionId);
   const imageAssets = (assets || []).filter((asset) => ['image', 'poster', 'banner'].includes(asset.asset_type || asset.assetType));
-  const modelsByNodeType = Object.groupBy
-    ? Object.groupBy(models || [], (model) => model.schema?.nodeType || model.modality)
-    : {};
 
   return (
     <section className="playground-shell">
@@ -1056,6 +1075,26 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
           ))}
         </div>
         <label>
+          模型能力
+          <select value={selectedModel} onChange={(event) => setSelectedModel(event.target.value)}>
+            {!modelsForMode.length && <option value="">当前模式暂无可用模型</option>}
+            {modelsForMode.map((model) => (
+              <option key={model.model_key} value={model.model_key}>
+                {model.name} · {money(model.price_cents)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="playground-model-card">
+          <span>运行前预估</span>
+          <strong>{selectedModelRow ? money(selectedModelRow.price_cents) : '暂无模型'}</strong>
+          <small>
+            {selectedModelRow
+              ? `${selectedModelRow.name} / ${currentNodeType}`
+              : '该能力未配置可上线模型，不能运行'}
+          </small>
+        </div>
+        <label>
           输入
           <textarea value={text} onChange={(event) => setText(event.target.value)} />
         </label>
@@ -1101,13 +1140,21 @@ function PlaygroundPanel({ api, assets, models, refresh, setMessage }) {
           </>
         )}
         <div className="playground-models">
-          <strong>可用能力</strong>
-          {(models || []).slice(0, 6).map((model) => (
-            <span key={model.model_key}>{model.name}</span>
+          <strong>当前模式可选模型</strong>
+          {modelsForMode.map((model) => (
+            <button
+              type="button"
+              key={model.model_key}
+              className={model.model_key === selectedModel ? 'active' : ''}
+              onClick={() => setSelectedModel(model.model_key)}
+            >
+              <span>{model.name}</span>
+              <small>{money(model.price_cents)}</small>
+            </button>
           ))}
-          {!Object.keys(modelsByNodeType).length && <span>等待模型能力同步</span>}
+          {!modelsForMode.length && <span>等待管理员配置该模式的模型能力</span>}
         </div>
-        <button className="primary wide" disabled={busy || !activeSessionId} onClick={runPlayground}>
+        <button className="primary wide" disabled={busy || !activeSessionId || !selectedModel} onClick={runPlayground}>
           <Play size={16} /> {busy ? '运行中' : '运行操练'}
         </button>
       </aside>
