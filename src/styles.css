@@ -866,7 +866,7 @@ small,
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--surface-2) 72%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
 }
 
 .batch-strip span {
@@ -929,16 +929,21 @@ small,
   justify-content: flex-start;
   text-align: left;
   gap: 5px;
+  width: 100%;
+  box-shadow: none;
 }
 
 .sort-link:hover:not(:disabled),
 .sort-link.active {
+  background: transparent;
   color: var(--accent);
   border-color: transparent;
+  box-shadow: none;
 }
 
 .sort-link small {
   font-size: 12px;
+  color: var(--accent);
 }
 
 .empty-table {
