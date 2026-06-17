@@ -215,7 +215,10 @@ function App() {
     id: null,
     title: '新产出链条',
     description: '把真实组件连接成可以运行、导出和发布的无代码 workflow。',
-    graph: emptyGraph
+    graph: emptyGraph,
+    licenseMode: 'closed',
+    tags: 'local-runtime,poster',
+    priceCents: 0
   });
   const [workflowEditorMode, setWorkflowEditorMode] = useState('auto');
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -321,7 +324,10 @@ function App() {
       id: workflow.id,
       title: workflow.title,
       description: workflow.description,
-      graph: workflow.graph
+      graph: workflow.graph,
+      licenseMode: workflow.license_mode || 'closed',
+      tags: Array.isArray(workflow.tags) ? workflow.tags.join(',') : (workflow.tags || 'local-runtime,poster'),
+      priceCents: Number(workflow.price_cents || 0)
     });
     setNodes(flow.nodes);
     setEdges(flow.edges);
@@ -425,7 +431,15 @@ function App() {
 
   function newWorkflow() {
     setWorkflowEditorMode('new');
-    setDraft({ id: null, title: '新产出链条', description: '把真实组件连接成可以运行、导出和发布的无代码 workflow。', graph: emptyGraph });
+    setDraft({
+      id: null,
+      title: '新产出链条',
+      description: '把真实组件连接成可以运行、导出和发布的无代码 workflow。',
+      graph: emptyGraph,
+      licenseMode: 'closed',
+      tags: 'local-runtime,poster',
+      priceCents: 0
+    });
     setNodes([]);
     setEdges([]);
     setSelectedNodeId('');
@@ -483,7 +497,7 @@ function App() {
     }
     const created = await api('/api/workflows', { method: 'POST', body: JSON.stringify(payload) });
     setWorkflowEditorMode('existing');
-    setDraft({ id: created.id, title: created.title, description: created.description, graph: created.graph });
+    setDraft((current) => ({ ...current, id: created.id, title: created.title, description: created.description, graph: created.graph }));
     setMessage('工作流已创建并通过后端校验');
     await refresh();
     return created.id;
@@ -525,9 +539,14 @@ function App() {
     if (!id) return;
     await api(`/api/workflows/${id}/publish`, {
       method: 'POST',
-      body: JSON.stringify({ licenseMode: 'open', tags: ['local-runtime', 'poster'], summary: draft.description })
+      body: JSON.stringify({
+        licenseMode: draft.licenseMode || 'closed',
+        tags: String(draft.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean),
+        summary: draft.description,
+        priceCents: Number(draft.priceCents || 0)
+      })
     });
-    setMessage('已发布到创意工坊');
+    setMessage(`已发布到创意工坊：${draft.licenseMode === 'open' ? '开源可克隆' : '闭源可运行'}，价格 ${money(draft.priceCents || 0)}`);
     await refresh();
   }
 
@@ -1184,6 +1203,21 @@ function WorkflowPanel(props) {
               运行文本
               <input value={runInput} onChange={(event) => setRunInput(event.target.value)} />
             </label>
+            <label>
+              发布授权
+              <select value={draft.licenseMode || 'closed'} onChange={(event) => setDraft({ ...draft, licenseMode: event.target.value })}>
+                <option value="closed">闭源可运行</option>
+                <option value="open">开源可克隆</option>
+              </select>
+            </label>
+            <label>
+              工坊标签
+              <input value={draft.tags || ''} onChange={(event) => setDraft({ ...draft, tags: event.target.value })} />
+            </label>
+            <label>
+              售价（分）
+              <input type="number" min="0" value={draft.priceCents || 0} onChange={(event) => setDraft({ ...draft, priceCents: Number(event.target.value || 0) })} />
+            </label>
           </div>
           <div className="builder-actions">
             <span>{money(estimate)} / 次</span>
@@ -1289,32 +1323,181 @@ function ConfigField({ field, value, onChange }) {
 }
 
 function Workshop({ rows, api, refresh, setMessage }) {
-  async function run(item) {
-    const result = await api(`/api/workshop/items/${item.id}/run`, { method: 'POST', body: JSON.stringify({ prompt: item.title }) });
+  const [filters, setFilters] = useState({ page: 1, pageSize: 9, q: '', licenseMode: 'all', sort: 'popular' });
+  const [page, setPage] = useState(normalizePage(rows, 9));
+  const [selected, setSelected] = useState(null);
+  const [comments, setComments] = useState(normalizePage([], 6));
+  const [estimate, setEstimate] = useState(null);
+  const [runPrompt, setRunPrompt] = useState('');
+  const [commentText, setCommentText] = useState('');
+  const [rating, setRating] = useState(5);
+  const [report, setReport] = useState({ reason: '内容违规', detail: '' });
+
+  const loadPage = useCallback(async (nextFilters = filters) => {
+    const payload = await api(`/api/workshop/items?${queryFrom(nextFilters)}`);
+    setPage(normalizePage(payload, nextFilters.pageSize));
+  }, [api, filters]);
+
+  useEffect(() => {
+    loadPage(filters).catch((error) => setMessage(error.message || '创意工坊加载失败'));
+  }, []);
+
+  async function openItem(item) {
+    const [detail, commentPage, cost] = await Promise.all([
+      api(`/api/workshop/items/${item.id}`),
+      api(`/api/workshop/items/${item.id}/comments?page=1&pageSize=6`),
+      api(`/api/workshop/items/${item.id}/estimate`).catch(() => null)
+    ]);
+    setSelected(detail);
+    setComments(normalizePage(commentPage, 6));
+    setEstimate(cost);
+    setRunPrompt(detail.summary || detail.title || '');
+  }
+
+  async function applyFilters(patch) {
+    const next = { ...filters, ...patch };
+    setFilters(next);
+    await loadPage(next);
+  }
+
+  async function reloadSelected(item = selected) {
+    if (!item?.id) return;
+    await openItem(item);
+    await loadPage(filters);
+  }
+
+  async function run(item = selected) {
+    const result = await api(`/api/workshop/items/${item.id}/run`, {
+      method: 'POST',
+      body: JSON.stringify({ prompt: runPrompt || item.title })
+    });
     setMessage(`工坊 workflow 已真实运行：#${result.taskId}`);
+    await reloadSelected(item);
     await refresh();
   }
 
-  async function clone(item) {
+  async function clone(item = selected) {
     await api(`/api/workshop/items/${item.id}/clone`, { method: 'POST' });
     setMessage('已克隆到我的 workflow');
     await refresh();
   }
 
+  async function favorite(item = selected) {
+    await api(`/api/workshop/items/${item.id}/favorite`, { method: 'POST' });
+    setMessage('已收藏该 workflow');
+    await reloadSelected(item);
+  }
+
+  async function rate(item = selected) {
+    await api(`/api/workshop/items/${item.id}/rating`, {
+      method: 'POST',
+      body: JSON.stringify({ rating: Number(rating) })
+    });
+    setMessage('评分已提交');
+    await reloadSelected(item);
+  }
+
+  async function comment(item = selected) {
+    if (!commentText.trim()) return;
+    await api(`/api/workshop/items/${item.id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content: commentText.trim() })
+    });
+    setCommentText('');
+    setMessage('评论已发布');
+    await reloadSelected(item);
+  }
+
+  async function reportItem(item = selected) {
+    await api(`/api/workshop/items/${item.id}/report`, {
+      method: 'POST',
+      body: JSON.stringify(report)
+    });
+    setReport({ reason: '内容违规', detail: '' });
+    setMessage('举报已提交，等待管理员审核');
+  }
+
   return (
-    <section className="grid cards">
-      {!rows.length && <div className="panel empty-table">创意工坊还没有公开项目</div>}
-      {rows.map((item) => (
-        <article className="panel workshop-item" key={item.id}>
-          <h2>{item.title}</h2>
-          <p>{item.summary}</p>
-          <div className="tags">{(item.tags || []).map((tag) => <span key={tag}>{tag}</span>)}</div>
-          <div className="row-actions">
-            <button onClick={() => run(item)}><Play size={15} /> 运行</button>
-            <button onClick={() => clone(item)}><Plus size={15} /> 克隆</button>
+    <section className="stack">
+      <div className="panel filter-row">
+        <span className="searchbox"><Search size={15} /><input value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value })} placeholder="标题、作者、标签" /></span>
+        <select value={filters.licenseMode} onChange={(event) => applyFilters({ licenseMode: event.target.value, page: 1 })}>
+          <option value="all">全部授权</option>
+          <option value="open">开源</option>
+          <option value="closed">闭源</option>
+        </select>
+        <select value={filters.sort} onChange={(event) => applyFilters({ sort: event.target.value, page: 1 })}>
+          <option value="popular">热门</option>
+          <option value="latest">最新</option>
+          <option value="income">收入</option>
+          <option value="rating">评分</option>
+        </select>
+        <button onClick={() => applyFilters({ page: 1 })}>搜索</button>
+      </div>
+      <section className="grid cards">
+        {!page.items.length && <div className="panel empty-table">创意工坊还没有公开项目</div>}
+        {page.items.map((item) => (
+          <article className="panel workshop-item" key={item.id}>
+            <h2>{item.title}</h2>
+            <p>{item.summary}</p>
+            <div className="tags">{(item.tags || []).map((tag) => <span key={tag}>{tag}</span>)}</div>
+            <div className="status-line">
+              <span>{item.license_mode === 'open' ? '开源' : '闭源'} · {money(item.price_cents || 0)}</span>
+              <span>评分 {Number(item.avg_rating || 0).toFixed(1)} / 收藏 {item.favorite_count || 0}</span>
+            </div>
+            <div className="row-actions">
+              <button onClick={() => openItem(item)}>详情</button>
+              {item.license_mode === 'open' && <button onClick={() => clone(item)}><Plus size={15} /> 克隆</button>}
+            </div>
+          </article>
+        ))}
+      </section>
+      <Pagination page={page} onChange={applyFilters} />
+
+      {selected && (
+        <section className="panel task-detail">
+          <div className="panel-head">
+            <h2>{selected.title}</h2>
+            <span className="pill">{selected.license_mode === 'open' ? '开源' : '闭源'}</span>
           </div>
-        </article>
-      ))}
+          <p>{selected.summary || selected.description}</p>
+          <div className="status-line">
+            <strong>{estimate ? money(estimate.estimatedCostCents) : money(selected.price_cents || 0)} / 次</strong>
+            <span>模型 {estimate ? money(estimate.modelUsageCostCents) : '-'} · workflow {estimate ? money(estimate.workflowFeeCents) : money(selected.price_cents || 0)}</span>
+          </div>
+          <label>运行提示词<textarea value={runPrompt} onChange={(event) => setRunPrompt(event.target.value)} /></label>
+          <div className="row-actions">
+            <button className="primary" onClick={() => run(selected)}><Play size={15} /> 运行</button>
+            {selected.license_mode === 'open' && <button onClick={() => clone(selected)}><Plus size={15} /> 克隆</button>}
+            <button onClick={() => favorite(selected)}>收藏</button>
+          </div>
+          <div className="grid two">
+            <div>
+              <h3>评分与评论</h3>
+              <label>评分<select value={rating} onChange={(event) => setRating(Number(event.target.value))}>
+                {[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{value} 星</option>)}
+              </select></label>
+              <button onClick={() => rate(selected)}>提交评分</button>
+              <label>评论<textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} /></label>
+              <button onClick={() => comment(selected)}>发布评论</button>
+              <div className="event-list">
+                {comments.items.map((item) => (
+                  <div key={item.id}>
+                    <span>{item.user_name}</span>
+                    <p>{item.content}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h3>举报</h3>
+              <label>原因<input value={report.reason} onChange={(event) => setReport({ ...report, reason: event.target.value })} /></label>
+              <label>详情<textarea value={report.detail} onChange={(event) => setReport({ ...report, detail: event.target.value })} /></label>
+              <button onClick={() => reportItem(selected)}>提交举报</button>
+            </div>
+          </div>
+        </section>
+      )}
     </section>
   );
 }
