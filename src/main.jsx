@@ -615,7 +615,7 @@ function App() {
       method: 'POST',
       body: JSON.stringify({ code })
     });
-    setMessage(`Coupon redeemed: ${money(result.amountCents || 0)}`);
+    setMessage(`优惠券已兑换，入账 ${money(result.amountCents || 0)}`);
     await refresh();
   }
 
@@ -624,13 +624,13 @@ function App() {
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    setMessage(`Withdraw order #${result.id} created`);
+    setMessage(`提现申请 #${result.id} 已创建`);
     await refresh();
   }
 
   async function refreshProviderJob(row) {
     const result = await api(`/api/provider-jobs/${row.id}/refresh`, { method: 'POST' });
-    setMessage(`Provider job #${row.id}: ${result.status || row.status}`);
+    setMessage(`上游任务 #${row.id} 已同步为 ${result.status || row.status}`);
     await refresh();
   }
 
@@ -1539,7 +1539,7 @@ function BillingPanel({ summary, wallet, ledgers, orders, withdraws, invite, fil
     <section className="stack">
       <div className="billing-hero panel">
         <div>
-          <p className="eyebrow">Billing</p>
+          <p className="eyebrow">账单</p>
           <h2>{money(wallet.balanceCents)}</h2>
           <p>充值订单创建后保持待确认，管理员确认真实收款才会入账。所有扣费与入账都会写入钱包流水。</p>
         </div>
@@ -1566,39 +1566,39 @@ function BillingPanel({ summary, wallet, ledgers, orders, withdraws, invite, fil
         </section>
         <section className="panel billing-tool">
           <div className="panel-head">
-            <h2>Coupon</h2>
+            <h2>优惠券</h2>
             <ReceiptText size={17} />
           </div>
-          <label>Code<input value={couponCode} onChange={(event) => setCouponCode(event.target.value)} placeholder="SF-COUPON" /></label>
-          <button onClick={() => redeemCoupon(couponCode)}>Redeem coupon</button>
+          <label>优惠券码<input value={couponCode} onChange={(event) => setCouponCode(event.target.value)} placeholder="SF-COUPON" /></label>
+          <button onClick={() => redeemCoupon(couponCode)}>兑换优惠券</button>
         </section>
         <section className="panel billing-tool">
           <div className="panel-head">
-            <h2>Withdraw</h2>
+            <h2>提现申请</h2>
             <CircleDollarSign size={17} />
           </div>
           <div className="grid two compact-grid">
-            <label>Amount cents<input type="number" min="1" value={withdrawForm.amountCents} onChange={(event) => setWithdrawForm({ ...withdrawForm, amountCents: Number(event.target.value || 0) })} /></label>
-            <label>Channel<select value={withdrawForm.channel} onChange={(event) => setWithdrawForm({ ...withdrawForm, channel: event.target.value })}>
-              <option value="alipay">Alipay</option>
-              <option value="wechat">WeChat</option>
+            <label>提现金额（分）<input type="number" min="1" value={withdrawForm.amountCents} onChange={(event) => setWithdrawForm({ ...withdrawForm, amountCents: Number(event.target.value || 0) })} /></label>
+            <label>提现渠道<select value={withdrawForm.channel} onChange={(event) => setWithdrawForm({ ...withdrawForm, channel: event.target.value })}>
+              <option value="alipay">支付宝</option>
+              <option value="wechat">微信</option>
             </select></label>
           </div>
-          <label>Account name<input value={withdrawForm.accountName} onChange={(event) => setWithdrawForm({ ...withdrawForm, accountName: event.target.value })} /></label>
-          <label>Account no<input value={withdrawForm.accountNo} onChange={(event) => setWithdrawForm({ ...withdrawForm, accountNo: event.target.value })} /></label>
-          <button onClick={() => createWithdraw(withdrawForm)}>Create withdraw order</button>
+          <label>收款姓名<input value={withdrawForm.accountName} onChange={(event) => setWithdrawForm({ ...withdrawForm, accountName: event.target.value })} /></label>
+          <label>收款账号<input value={withdrawForm.accountNo} onChange={(event) => setWithdrawForm({ ...withdrawForm, accountNo: event.target.value })} /></label>
+          <button onClick={() => createWithdraw(withdrawForm)}>创建提现申请</button>
         </section>
       </div>
 
       <div className="panel invite-panel">
         <div>
-          <p className="eyebrow">Invite</p>
-          <h2>{invite?.code || 'No code'}</h2>
-          <p>Invite rewards are granted after the invitee completes a real recharge.</p>
+          <p className="eyebrow">邀请</p>
+          <h2>{invite?.code || '暂无邀请码'}</h2>
+          <p>被邀请用户完成真实充值后，邀请奖励会自动入账。</p>
         </div>
         <div className="mini-stats">
-          <span>Pending {invite?.stats?.pending || 0}</span>
-          <span>Granted {invite?.stats?.granted || 0}</span>
+          <span>待入账 {invite?.stats?.pending || 0}</span>
+          <span>已入账 {invite?.stats?.granted || 0}</span>
           <span>{money(invite?.stats?.reward_cents || 0)}</span>
         </div>
       </div>
@@ -1638,19 +1638,19 @@ function BillingPanel({ summary, wallet, ledgers, orders, withdraws, invite, fil
         filters={filters.withdraws}
         onFilter={(patch) => updateFilter('withdraws', patch)}
         statusOptions={['pending', 'approved', 'paid', 'rejected', 'cancelled']}
-        searchPlaceholder="Search withdraw status"
+        searchPlaceholder="搜索提现状态、渠道或账号"
         columns={[
           ['id', 'ID'],
-          ['amount_cents', 'Amount'],
-          ['arrival_cents', 'Arrival'],
-          ['channel', 'Channel'],
-          ['status', 'Status'],
-          ['created_at', 'Created']
+          ['amount_cents', '申请金额'],
+          ['arrival_cents', '到账金额'],
+          ['channel', '渠道'],
+          ['status', '状态'],
+          ['created_at', '创建时间']
         ]}
       />
 
       <PaginatedTable
-        title="Wallet ledgers"
+        title="钱包流水"
         icon={<CircleDollarSign size={17} />}
         page={ledgers}
         filters={filters.ledgers}
@@ -1680,11 +1680,11 @@ function UsagePanel({ tasks, providerJobs, filters, providerJobFilters, updateFi
         filters={filters}
         onFilter={updateFilter}
         statusOptions={['queued', 'running', 'succeeded', 'failed', 'cancelled']}
-        searchPlaceholder="搜索任务 ID、状态、workflow 或错误"
+        searchPlaceholder="搜索任务 ID、状态、工作流或错误"
         columns={[
           ['id', 'ID'],
           ['status', '状态'],
-          ['workflow_title', 'Workflow'],
+          ['workflow_title', '工作流'],
           ['workshop_title', '工坊来源'],
           ['cost_cents', '扣费'],
           ['created_at', '创建时间']
@@ -1692,16 +1692,16 @@ function UsagePanel({ tasks, providerJobs, filters, providerJobFilters, updateFi
         action={(row) => <button onClick={() => openTask(row.id)}>查看</button>}
       />
       <PaginatedTable
-        title="Provider 视频任务"
+        title="供应方视频任务"
         icon={<Video size={17} />}
         page={providerJobs}
         filters={providerJobFilters}
         onFilter={updateProviderJobFilter}
         statusOptions={['queued', 'running', 'waiting_callback', 'succeeded', 'failed', 'cancelled']}
-        searchPlaceholder="Provider、模型、上游任务号或状态"
+        searchPlaceholder="供应方、模型、上游任务号或状态"
         columns={[
           ['id', 'ID'],
-          ['provider_key', 'Provider'],
+          ['provider_key', '供应方'],
           ['model_key', '模型'],
           ['upstream_job_id', '上游任务'],
           ['mode', '模式'],
