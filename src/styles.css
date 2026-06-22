@@ -2616,11 +2616,39 @@ code {
   }
 
   .model-table {
-    overflow-x: auto;
+    overflow-x: visible;
   }
 
   .model-row {
-    min-width: 620px;
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .model-row.header {
+    display: none;
+  }
+
+  .model-row strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .model-row span {
+    display: inline-flex;
+    width: fit-content;
+    max-width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 9px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.05);
+    overflow-wrap: anywhere;
+  }
+
+  .model-row .row-action {
+    width: 100%;
   }
 
   .workspace {
