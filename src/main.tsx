@@ -276,6 +276,13 @@ type WorkflowRunNode = {
   workflowVersionId?: string;
   generationTaskId?: string;
   workId?: string;
+  workStatus?: string;
+  workDownloadEnabled?: boolean;
+  workLockedUntilPurchase?: boolean;
+  workIsTrialOutput?: boolean;
+  workIsIntermediateOutput?: boolean;
+  workGalleryVisible?: boolean;
+  workGalleryStatus?: string;
   nodeId?: string;
   componentKey?: string;
   label?: string;
@@ -4585,6 +4592,8 @@ function RunsPanel({ onToast }: { onToast: (toast: Toast) => void }) {
                   const workId = workflowNodeWorkId(node);
                   const previewUrl = workflowNodeCoverUrl(node);
                   const resultUrls = workflowNodeResultUrls(node);
+                  const workLocked = Boolean(node.workLockedUntilPurchase);
+                  const workDownloadAllowed = node.workDownloadEnabled !== false && !workLocked;
                   return (
                     <article key={node.id} className={`run-node ${node.status || "queued"}`}>
                       <div>
@@ -4595,6 +4604,9 @@ function RunsPanel({ onToast }: { onToast: (toast: Toast) => void }) {
                         <span>{node.costPoints || 0} 点</span>
                         <span>{node.isTerminalOutput ? "最终输出" : node.isIntermediateOutput ? "中间结果" : "辅助节点"}</span>
                         {workId ? <span>作品 {workId.slice(-8)}</span> : null}
+                        {node.workIsTrialOutput ? <span>试运行产物</span> : null}
+                        {workLocked ? <span>购买后解锁</span> : null}
+                        {node.workDownloadEnabled === false ? <span>不可下载</span> : null}
                         {node.generationTaskId ? <span>任务 {node.generationTaskId.slice(-8)}</span> : null}
                         {resultUrls.length ? <span>{resultUrls.length} 个结果</span> : null}
                       </div>
@@ -4613,12 +4625,14 @@ function RunsPanel({ onToast }: { onToast: (toast: Toast) => void }) {
                             <Icon name="view" />
                             {busyWorkId === `open:${workId}` ? "打开中" : "查看作品"}
                           </Button>
-                          <Button variant="ghost" onClick={() => downloadWork(workId)} disabled={Boolean(busyWorkId)}>
+                          <Button variant="ghost" onClick={() => downloadWork(workId)} disabled={Boolean(busyWorkId) || !workDownloadAllowed}>
                             <Icon name="download" />
-                            {busyWorkId === `download:${workId}` ? "获取中" : "下载"}
+                            {workLocked ? "购买后下载" : busyWorkId === `download:${workId}` ? "获取中" : "下载"}
                           </Button>
                         </div>
                       ) : null}
+                      {workLocked ? <p className="danger-text">该试运行节点作品需要购买对应 Workflow 后才能下载或发布。</p> : null}
+                      {!workLocked && node.workDownloadEnabled === false ? <p className="danger-text">该节点作品已关闭下载权限。</p> : null}
                       {node.errorMessage ? <p className="danger-text">{node.errorMessage}</p> : null}
                       {node.input?.prompt ? <p className="node-prompt">{String(node.input.prompt)}</p> : null}
                     </article>
