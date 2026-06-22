@@ -22,6 +22,7 @@ https://api.seefactory.xyz/api/v1
 - 我的作品：私有作品库、状态/工具筛选、预览、下载、发布/取消发布广场、分享链接、再次生成、删除和失败作品清理。
 - 公开作品广场：读取 `/gallery/works`，支持精选筛选、详情、提示词复制、下载权限和同款创作。
 - 分享页：支持 `/share/:ticket`，读取 `/works/share/:ticket` 并通过 `shareTicket` 下载。
+- 帮助中心：读取 `/customer-service`，展示微信客服、Telegram、邮箱、二维码和客服说明。
 - Workflow 控制台：组件选择、线性 graph、节点配置、服务端校验、估价、测试运行、发布、导入和导出 `.seeflow`。
 - Workflow 案例：购买、试运行、正式运行、克隆、导出、已购模板库、运行记录和节点输出预览。
 - 钱包：点数余额、冻结点数、点数流水、CNY 自填金额、Crypto bridge 充值订单和支付状态轮询。
@@ -125,6 +126,7 @@ dist/
 - `GET /gallery/works`
 - `GET /gallery/works/:id`
 - `GET /works/share/:ticket`
+- `GET /customer-service`
 - `GET /works`
 - `GET /works/:id`
 - `GET /works/:id/download-url`
