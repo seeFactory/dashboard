@@ -124,13 +124,21 @@ type CaseContent = {
   disabled?: boolean;
   disabledReason?: string;
   hasReplacementModel?: boolean;
+  visibility?: string;
+  listingStatus?: string;
+  public?: boolean;
+  creatorUserId?: string;
+  deletedByAuthorAt?: string;
   purchaseRequired?: boolean;
   allowClone?: boolean;
   allowExport?: boolean;
   purchaseCount?: number;
   runCount?: number;
+  trialRunCount?: number;
   cloneCount?: number;
   runForm?: WorkflowRunForm;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 type WorkflowPurchaseStatus = {
@@ -1026,6 +1034,18 @@ function workflowCanRun(item?: { canRun?: boolean; runnable?: boolean; status?: 
 
 function workflowBlockedReason(item?: { runBlockedReason?: string; disabledReason?: string } | null) {
   return item?.runBlockedReason || item?.disabledReason || "";
+}
+
+function workflowCaseLifecycle(caseContent?: CaseContent | null) {
+  if (!caseContent) return { label: "--", tone: "idle" };
+  if (caseContent.disabled || caseContent.visibility === "disabled" || caseContent.listingStatus === "disabled") {
+    return { label: "已禁用", tone: "danger" };
+  }
+  if (caseContent.deletedByAuthorAt) return { label: "已停止公开", tone: "stopped" };
+  if (caseContent.public === false || caseContent.visibility === "hidden" || caseContent.listingStatus === "hidden") {
+    return { label: "已隐藏", tone: "hidden" };
+  }
+  return { label: "公开中", tone: "listed" };
 }
 
 function formatCnyFromCents(value?: number) {
@@ -3562,6 +3582,9 @@ function WorkflowConsole({
   const [validation, setValidation] = useState<WorkflowValidation | null>(null);
   const [workflows, setWorkflows] = useState<WorkflowDraft[]>([]);
   const [workflowLoading, setWorkflowLoading] = useState(false);
+  const [publishedCases, setPublishedCases] = useState<CaseContent[]>([]);
+  const [publishedLoading, setPublishedLoading] = useState(false);
+  const [publishedBusyId, setPublishedBusyId] = useState("");
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadWorkflows = () => {
@@ -3572,12 +3595,21 @@ function WorkflowConsole({
       .finally(() => setWorkflowLoading(false));
   };
 
+  const loadPublishedCases = () => {
+    setPublishedLoading(true);
+    return apiGet<PageData<CaseContent>>("/workflow-cases/mine?pageSize=12", { auth: true })
+      .then((data) => setPublishedCases(data.list || []))
+      .catch((err) => onToast({ title: err instanceof Error ? err.message : "我的发布列表加载失败", tone: "danger" }))
+      .finally(() => setPublishedLoading(false));
+  };
+
   useEffect(() => {
     setSelectedNodes((current) => (current.length ? current : components.slice(0, Math.min(3, components.length)).map((component) => createEditorNode(component))));
   }, [components]);
 
   useEffect(() => {
     loadWorkflows();
+    loadPublishedCases();
   }, []);
 
   const graph = buildWorkflowGraph(selectedNodes, tools);
@@ -3749,6 +3781,7 @@ function WorkflowConsole({
       );
       setDraft(result.workflow || saved);
       loadWorkflows();
+      loadPublishedCases();
       onToast({ title: result.case?.title ? `已发布到案例广场：${result.case.title}` : "Workflow 已发布到案例广场", tone: "success" });
     } catch (err) {
       onToast({ title: err instanceof Error ? err.message : "Workflow 发布失败", tone: "danger" });
@@ -3766,6 +3799,19 @@ function WorkflowConsole({
     setActiveNodeKey(restoredNodes[0]?.nodeKey || "");
     setValidation(null);
     onToast({ title: `已打开草稿：${workflow.title}`, tone: "info" });
+  };
+
+  const stopPublishedCase = async (caseContent: CaseContent) => {
+    setPublishedBusyId(caseContent.id);
+    try {
+      await apiPost<CaseContent>(`/workflow-cases/${caseContent.id}/delete`, {}, { auth: true });
+      await loadPublishedCases();
+      onToast({ title: "已停止公开展示和新增购买，已购用户权益仍保留。", tone: "success" });
+    } catch (err) {
+      onToast({ title: err instanceof Error ? err.message : "停止公开失败", tone: "danger" });
+    } finally {
+      setPublishedBusyId("");
+    }
   };
 
   const exportWorkflow = async () => {
@@ -3879,6 +3925,42 @@ function WorkflowConsole({
               <Icon name="empty" />
               <span>暂无草稿</span>
               <small>保存或导入 Workflow 后会出现在这里。</small>
+            </div>
+          )}
+        </div>
+        <div className="workflow-published">
+          <div className="draft-head">
+            <h3>我的发布</h3>
+            <button onClick={loadPublishedCases} disabled={publishedLoading || Boolean(busy)}>
+              {publishedLoading ? "同步中" : "刷新"}
+            </button>
+          </div>
+          {publishedCases.length ? (
+            publishedCases.slice(0, 12).map((item) => {
+              const lifecycle = workflowCaseLifecycle(item);
+              const stopped = Boolean(item.deletedByAuthorAt || item.public === false || item.visibility === "hidden" || item.listingStatus === "hidden");
+              return (
+                <article className="published-case" key={item.id}>
+                  <div>
+                    <span className={`lifecycle ${lifecycle.tone}`}>{lifecycle.label}</span>
+                    <strong>{item.title}</strong>
+                    <small>{item.licenseMode === "closed_paid" ? `${item.pricePoints || 0} 点` : "开源免费"} · 购 {item.purchaseCount || 0} · 跑 {item.runCount || 0}</small>
+                  </div>
+                  <button
+                    className="link-danger"
+                    onClick={() => stopPublishedCase(item)}
+                    disabled={publishedBusyId === item.id || stopped || item.disabled}
+                  >
+                    {publishedBusyId === item.id ? "处理中" : stopped ? "已停止" : "停止公开"}
+                  </button>
+                </article>
+              );
+            })
+          ) : (
+            <div className="component-empty">
+              <Icon name="empty" />
+              <span>暂无发布案例</span>
+              <small>发布后的 Workflow 会在这里治理生命周期。</small>
             </div>
           )}
         </div>

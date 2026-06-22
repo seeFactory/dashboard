@@ -2069,7 +2069,8 @@ code {
   color: var(--muted);
 }
 
-.workflow-drafts {
+.workflow-drafts,
+.workflow-published {
   display: grid;
   gap: 8px;
   margin-top: 10px;
@@ -2102,6 +2103,74 @@ code {
 .workflow-drafts button.active {
   border-color: rgba(98, 230, 209, 0.46);
   background: rgba(98, 230, 209, 0.08);
+}
+
+.published-case {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(154, 178, 212, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.published-case > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.published-case strong,
+.published-case small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.published-case small {
+  color: var(--muted);
+}
+
+.published-case .link-danger {
+  justify-content: center;
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid rgba(255, 114, 143, 0.28);
+  border-radius: 8px;
+  color: #ff96aa;
+  background: rgba(255, 114, 143, 0.08);
+}
+
+.published-case .link-danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.lifecycle {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lifecycle.listed {
+  color: var(--cyan);
+  background: rgba(98, 230, 209, 0.1);
+}
+
+.lifecycle.hidden,
+.lifecycle.stopped {
+  color: #ffc76a;
+  background: rgba(255, 199, 106, 0.1);
+}
+
+.lifecycle.danger {
+  color: #ff96aa;
+  background: rgba(255, 114, 143, 0.1);
 }
 
 .workflow-toolbar {
