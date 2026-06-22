@@ -1,9 +1,25 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const source = readFileSync(resolve("src/main.tsx"), "utf8");
 const styles = readFileSync(resolve("src/styles.css"), "utf8");
+const packageSource = readFileSync(resolve("package.json"), "utf8");
+
+function git(args) {
+  return execFileSync("git", args, {
+    cwd: resolve("."),
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  }).trim();
+}
+
+assert.equal(git(["rev-parse", "--is-inside-work-tree"]), "true", "dashboard/ must be the real Dashboard git worktree.");
+assert.equal(git(["remote", "get-url", "origin"]), "git@github.com:seeFactory/dashboard.git", "Dashboard origin remote must point to seeFactory/dashboard.git.");
+assert.ok(packageSource.includes('"packageManager": "pnpm@10.13.1"'), "Dashboard must keep the pnpm packageManager contract.");
+assert.ok(existsSync(resolve("pnpm-lock.yaml")), "Dashboard must track pnpm-lock.yaml for reproducible installs.");
+assert.ok(git(["ls-files", "--error-unmatch", "pnpm-lock.yaml"]), "Dashboard pnpm-lock.yaml must be tracked by git.");
 
 for (const asset of ["public/home-bg.mp4", "public/home-bg-poster.jpg"]) {
   assert.ok(existsSync(resolve(asset)), `Dashboard default home media asset must exist: ${asset}.`);
@@ -440,6 +456,8 @@ styleExcludes("@media (max-width: 720px) {\n  .model-table {\n    overflow-x: au
 
 console.log(JSON.stringify({
   checked: [
+    "Dashboard directory is the real git worktree for seeFactory/dashboard.git",
+    "Dashboard tracks pnpm-lock.yaml under pnpm@10.13.1",
     "Dashboard contains no hardcoded demo tools/models/cases",
     "Dashboard reads AppConfig, tools, cases, models, components and public recharge policy from backend APIs",
     "Dashboard renders empty/error states instead of business-data fallbacks",
