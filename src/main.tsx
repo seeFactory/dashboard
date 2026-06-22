@@ -3954,6 +3954,19 @@ function WorkflowConsole({
     }
   };
 
+  const hidePublishedCase = async (caseContent: CaseContent) => {
+    setPublishedBusyId(`hide:${caseContent.id}`);
+    try {
+      await apiPost<CaseContent>(`/workflow-cases/${caseContent.id}/hide`, {}, { auth: true });
+      await loadPublishedCases();
+      onToast({ title: "已隐藏展示，公开广场不再展示该 Workflow，已购用户权益仍保留。", tone: "success" });
+    } catch (err) {
+      onToast({ title: err instanceof Error ? err.message : "隐藏展示失败", tone: "danger" });
+    } finally {
+      setPublishedBusyId("");
+    }
+  };
+
   const exportWorkflow = async () => {
     setBusy("export");
     try {
@@ -4087,7 +4100,10 @@ function WorkflowConsole({
           {publishedCases.length ? (
             publishedCases.slice(0, 12).map((item) => {
               const lifecycle = workflowCaseLifecycle(item);
-              const stopped = Boolean(item.deletedByAuthorAt || item.public === false || item.visibility === "hidden" || item.listingStatus === "hidden");
+              const hidden = Boolean(!item.deletedByAuthorAt && (item.public === false || item.visibility === "hidden" || item.listingStatus === "hidden"));
+              const stopped = Boolean(item.deletedByAuthorAt);
+              const hideBusy = publishedBusyId === `hide:${item.id}`;
+              const stopBusy = publishedBusyId === item.id;
               return (
                 <article className="published-case" key={item.id}>
                   <div>
@@ -4095,13 +4111,22 @@ function WorkflowConsole({
                     <strong>{item.title}</strong>
                     <small>{item.licenseMode === "closed_paid" ? `${item.pricePoints || 0} 点` : "开源免费"} · 购 {item.purchaseCount || 0} · 跑 {item.runCount || 0}</small>
                   </div>
+                  <div className="published-actions">
+                    <button
+                      className="link-muted"
+                      onClick={() => hidePublishedCase(item)}
+                      disabled={hideBusy || hidden || stopped || item.disabled}
+                    >
+                      {hideBusy ? "处理中" : hidden ? "已隐藏" : "隐藏展示"}
+                    </button>
                   <button
                     className="link-danger"
                     onClick={() => stopPublishedCase(item)}
-                    disabled={publishedBusyId === item.id || stopped || item.disabled}
+                    disabled={stopBusy || stopped || item.disabled}
                   >
                     {publishedBusyId === item.id ? "处理中" : stopped ? "已停止" : "停止公开"}
                   </button>
+                  </div>
                 </article>
               );
             })

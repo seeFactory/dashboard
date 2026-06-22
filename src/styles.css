@@ -2192,17 +2192,34 @@ code {
   color: var(--muted);
 }
 
-.published-case .link-danger {
+.published-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.published-case .link-danger,
+.published-case .link-muted {
   justify-content: center;
   width: 100%;
   min-height: 34px;
-  border: 1px solid rgba(255, 114, 143, 0.28);
   border-radius: 8px;
+}
+
+.published-case .link-muted {
+  border: 1px solid rgba(154, 178, 212, 0.24);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.published-case .link-danger {
+  border: 1px solid rgba(255, 114, 143, 0.28);
   color: #ff96aa;
   background: rgba(255, 114, 143, 0.08);
 }
 
-.published-case .link-danger:disabled {
+.published-case .link-danger:disabled,
+.published-case .link-muted:disabled {
   cursor: not-allowed;
   opacity: 0.56;
 }
