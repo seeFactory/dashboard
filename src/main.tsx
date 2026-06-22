@@ -640,6 +640,7 @@ function usePublicData() {
   const [components, setComponents] = useState<ComponentDefinition[]>([]);
   const [customerService, setCustomerService] = useState<CustomerServiceConfig | null>(null);
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
+  const [rechargePolicy, setRechargePolicy] = useState<RechargePolicy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -652,9 +653,10 @@ function usePublicData() {
       settle(apiGet<PageData<ModelCapability>>("/models?pageSize=12")),
       settle(apiGet<PageData<ComponentDefinition>>("/components?pageSize=100&clientRuntime=h5-google")),
       settle(apiGet<CustomerServiceConfig>("/customer-service")),
-      settle(apiGet<{ list: FaqItem[] }>("/faqs"))
+      settle(apiGet<{ list: FaqItem[] }>("/faqs")),
+      settle(apiGet<RechargePolicy>("/credits/recharge-settings"))
     ])
-      .then(([toolResult, caseResult, galleryResult, modelResult, componentResult, customerResult, faqResult]) => {
+      .then(([toolResult, caseResult, galleryResult, modelResult, componentResult, customerResult, faqResult, rechargeResult]) => {
         if (!mounted) return;
         setTools(toolResult.ok ? toolResult.value : []);
         setCases(caseResult.ok ? caseResult.value.list || [] : []);
@@ -663,6 +665,7 @@ function usePublicData() {
         setComponents(componentResult.ok ? componentResult.value.list || [] : []);
         setCustomerService(customerResult.ok ? customerResult.value : null);
         setFaqs(faqResult.ok ? faqResult.value.list || [] : []);
+        setRechargePolicy(rechargeResult.ok ? rechargeResult.value : null);
         const errors = [
           toolResult.ok ? "" : `工具配置：${toolResult.reason?.message || "加载失败"}`,
           caseResult.ok ? "" : `案例配置：${caseResult.reason?.message || "加载失败"}`,
@@ -670,7 +673,8 @@ function usePublicData() {
           modelResult.ok ? "" : `模型能力：${modelResult.reason?.message || "加载失败"}`,
           componentResult.ok ? "" : `组件定义：${componentResult.reason?.message || "加载失败"}`,
           customerResult.ok ? "" : `客服配置：${customerResult.reason?.message || "加载失败"}`,
-          faqResult.ok ? "" : `FAQ：${faqResult.reason?.message || "加载失败"}`
+          faqResult.ok ? "" : `FAQ：${faqResult.reason?.message || "加载失败"}`,
+          rechargeResult.ok ? "" : `充值配置：${rechargeResult.reason?.message || "加载失败"}`
         ].filter(Boolean);
         setError(errors.join("；"));
       })
@@ -680,7 +684,7 @@ function usePublicData() {
     };
   }, []);
 
-  return { tools, cases, galleryWorks, models, components, customerService, faqs, loading, error };
+  return { tools, cases, galleryWorks, models, components, customerService, faqs, rechargePolicy, loading, error };
 }
 
 function Logo() {
@@ -2060,12 +2064,20 @@ function AgreementLinks({ onToast }: { onToast: (toast: Toast) => void }) {
 function PricingHelp({
   customerService,
   faqs,
+  rechargePolicy,
   onToast
 }: {
   customerService?: CustomerServiceConfig | null;
   faqs?: FaqItem[];
+  rechargePolicy?: RechargePolicy | null;
   onToast: (toast: Toast) => void;
 }) {
+  const pointRate = Number(rechargePolicy?.pointRate || 7);
+  const minAmount = formatCnyFromCents(rechargePolicy?.minAmountCents ?? 100);
+  const maxAmount = formatCnyFromCents(rechargePolicy?.maxAmountCents ?? 999900);
+  const customAmountText = rechargePolicy?.allowCustomAmount === false ? "当前不开放自填金额" : "支持自填充值金额";
+  const payPerGenerationText = rechargePolicy?.allowPayPerGeneration === false ? "本次生成直付暂不开放" : "支持余额不足时按本次生成补足";
+
   return (
     <>
       <section id="pricing" className="content-band pricing-grid">
@@ -2076,7 +2088,8 @@ function PricingHelp({
         </article>
         <article>
           <span className="eyebrow">Points</span>
-          <h2>1 CNY = 7 点</h2>
+          <h2>1 CNY = {formatPoints(pointRate)} 点</h2>
+          <p>{customAmountText}，单次充值范围 {minAmount} - {maxAmount}。{payPerGenerationText}。</p>
           <p>模板购买扣模板费，后续运行只扣模型节点点数。Workflow 运行采用预估冻结和实际结算。</p>
         </article>
         <article>
@@ -2113,7 +2126,7 @@ function PublicHome({
       <CaseSquare cases={data.cases} />
       <GalleryPanel tools={data.tools} initialWorks={data.galleryWorks} authed={authed} onLogin={onLogin} onToast={onToast} compact />
       <ModelTable models={data.models} />
-      <PricingHelp customerService={data.customerService} faqs={data.faqs} onToast={onToast} />
+      <PricingHelp customerService={data.customerService} faqs={data.faqs} rechargePolicy={data.rechargePolicy} onToast={onToast} />
     </>
   );
 }

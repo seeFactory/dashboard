@@ -16,7 +16,7 @@ https://api.seefactory.xyz/api/v1
 
 ## 当前能力
 
-- 公开首页：工具矩阵、Workflow 案例、公开作品广场、模型能力、价格说明。
+- 公开首页：工具矩阵、Workflow 案例、公开作品广场、模型能力、读取 `/credits/recharge-settings` 的价格说明。
 - 登录：PC H5 支持 Google、X、Telegram Login Widget。
 - 普通创作：从后端 `/tools` 渲染工具、模式、字段、素材槽位、比例、分辨率、视频精度和点数消耗。
 - 我的作品：私有作品库、状态/工具筛选、预览、下载、发布/取消发布广场、分享链接、再次生成、删除和失败作品清理。
