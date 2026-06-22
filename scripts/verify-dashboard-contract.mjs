@@ -292,6 +292,22 @@ for (const pattern of [
 }
 assert.ok(!source.includes("return fields.length ? fields : [{"), "Dashboard must not invent fallback workflow runForm fields when backend has not exposed them.");
 for (const pattern of [
+  "function summarizeWorkflowIncome",
+  "function IncomePanel",
+  'apiGet<PageData<WorkflowIncome>>("/workflow-creator-income?pageSize=30"',
+  "totalIncomePoints",
+  "totalPlatformFeePoints",
+  "availablePoints",
+  "frozenPoints",
+  "availableCount",
+  "frozenCount",
+  "income-layout",
+  "income-policy-card",
+  "income-table"
+]) {
+  includes(pattern, `Dashboard creator income contract must include ${pattern}.`);
+}
+for (const pattern of [
   "作者未开放可调整运行参数",
   "发布版本中锁定的默认配置"
 ]) {
@@ -519,7 +535,10 @@ for (const pattern of [
   ".faq-group",
   ".agreement-panel",
   ".agreement-link-grid",
-  ".agreement-viewer"
+  ".agreement-viewer",
+  ".income-layout",
+  ".income-policy-card",
+  ".income-table"
 ]) {
   styleIncludes(pattern, `Dashboard workflow case marketplace styles must include ${pattern}.`);
 }

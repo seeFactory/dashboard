@@ -2074,6 +2074,28 @@ code {
   margin-top: 20px;
 }
 
+.income-layout {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.income-policy-card {
+  display: grid;
+  gap: 12px;
+  background:
+    linear-gradient(135deg, rgba(98, 230, 209, 0.14), rgba(129, 140, 248, 0.08)),
+    rgba(15, 23, 42, 0.64);
+}
+
+.income-policy-card p {
+  max-width: 860px;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.income-table {
+  margin-top: 0;
+}
+
 .metric-card {
   padding: 18px;
 }
@@ -2597,6 +2619,7 @@ code {
   .tool-grid,
   .pricing-grid,
   .workspace-grid,
+  .income-layout,
   .works-grid,
   .identity-grid,
   .support-layout,
@@ -2641,6 +2664,7 @@ code {
   .tool-grid,
   .pricing-grid,
   .workspace-grid,
+  .income-layout,
   .works-grid,
   .workflow-form,
   .case-run-form,

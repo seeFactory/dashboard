@@ -4774,10 +4774,41 @@ function PurchasedTemplates({ onToast }: { onToast: (toast: Toast) => void }) {
   );
 }
 
+function summarizeWorkflowIncome(items: WorkflowIncome[]) {
+  return items.reduce(
+    (summary, item) => {
+      const grossPoints = Number(item.grossPoints || 0);
+      const platformFeePoints = Number(item.platformFeePoints || 0);
+      const incomePoints = Number(item.incomePoints || 0);
+      const availablePoints = item.status === "available" ? Number(item.availablePoints || incomePoints || 0) : 0;
+      const frozenPoints = item.status === "available" ? 0 : incomePoints;
+      return {
+        totalGrossPoints: summary.totalGrossPoints + grossPoints,
+        totalPlatformFeePoints: summary.totalPlatformFeePoints + platformFeePoints,
+        totalIncomePoints: summary.totalIncomePoints + incomePoints,
+        availablePoints: summary.availablePoints + availablePoints,
+        frozenPoints: summary.frozenPoints + frozenPoints,
+        availableCount: summary.availableCount + (item.status === "available" ? 1 : 0),
+        frozenCount: summary.frozenCount + (item.status === "available" ? 0 : 1)
+      };
+    },
+    {
+      totalGrossPoints: 0,
+      totalPlatformFeePoints: 0,
+      totalIncomePoints: 0,
+      availablePoints: 0,
+      frozenPoints: 0,
+      availableCount: 0,
+      frozenCount: 0
+    }
+  );
+}
+
 function IncomePanel() {
   const [items, setItems] = useState<WorkflowIncome[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const summary = summarizeWorkflowIncome(items);
 
   useEffect(() => {
     apiGet<PageData<WorkflowIncome>>("/workflow-creator-income?pageSize=30", { auth: true })
@@ -4794,7 +4825,34 @@ function IncomePanel() {
   if (!items.length) return <EmptyBlock title="暂无收益" body="发布闭源付费 Workflow 并产生购买后，收益会先冻结 72 小时。" />;
 
   return (
-    <div className="model-table workspace-section">
+    <div className="workspace-grid income-layout">
+      <div className="metric-card">
+        <span>应得收益</span>
+        <strong>{formatPoints(summary.totalIncomePoints)}</strong>
+      </div>
+      <div className="metric-card">
+        <span>可用点数</span>
+        <strong>{formatPoints(summary.availablePoints)}</strong>
+      </div>
+      <div className="metric-card">
+        <span>冻结点数</span>
+        <strong>{formatPoints(summary.frozenPoints)}</strong>
+      </div>
+      <div className="metric-card">
+        <span>平台抽佣</span>
+        <strong>{formatPoints(summary.totalPlatformFeePoints)}</strong>
+      </div>
+      <div className="wide-panel income-policy-card">
+        <div className="section-title-row">
+          <div>
+            <span className="eyebrow">Creator income</span>
+            <h2>创作者平台内收益</h2>
+          </div>
+          <span className="section-note">{summary.availableCount} 笔可用 · {summary.frozenCount} 笔冻结</span>
+        </div>
+        <p>闭源 Workflow 模板被购买后，收益先冻结 72 小时；到期后转为可用平台内点数，可用于生成或购买模板，不开放提现、转赠、退款或兑换现金。</p>
+      </div>
+      <div className="model-table wide-panel income-table">
       <div className="model-row header">
         <span>收益</span>
         <span>平台抽佣</span>
@@ -4803,12 +4861,13 @@ function IncomePanel() {
       </div>
       {items.map((item) => (
         <div className="model-row" key={item.id}>
-          <strong>{item.incomePoints || 0} 点</strong>
-          <span>{item.platformFeePoints || 0} 点</span>
+          <strong>{formatPoints(item.incomePoints)} 点</strong>
+          <span>{formatPoints(item.platformFeePoints)} 点</span>
           <span>{item.status === "available" ? "可用" : "冻结中"}</span>
           <span>{item.status === "available" ? formatDate(item.settledAt) : formatDate(item.frozenUntil)}</span>
         </div>
       ))}
+      </div>
     </div>
   );
 }
