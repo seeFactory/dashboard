@@ -38,11 +38,13 @@ for (const pattern of [
   'apiGet<PageData<Work>>("/gallery/works?pageSize=12")',
   'apiGet<PageData<ModelCapability>>("/models?pageSize=12")',
   'apiGet<PageData<ComponentDefinition>>("/components?pageSize=100&clientRuntime=h5-google")',
+  'apiGet<CustomerServiceConfig>("/customer-service")',
   "setTools(toolResult.ok ? toolResult.value : [])",
   "setCases(caseResult.ok ? caseResult.value.list || [] : [])",
   "setGalleryWorks(galleryResult.ok ? galleryResult.value.list || [] : [])",
   "setModels(modelResult.ok ? modelResult.value.list || [] : [])",
   "setComponents(componentResult.ok ? componentResult.value.list || [] : [])",
+  "setCustomerService(customerResult.ok ? customerResult.value : null)",
   "暂无公开工具",
   "暂无公开 Workflow 案例",
   "暂无公开作品",
@@ -247,6 +249,23 @@ for (const pattern of [
 }
 
 for (const pattern of [
+  '["help", "帮助中心", "mail"]',
+  "type CustomerServiceConfig",
+  "function SupportPanel",
+  "function telegramLink",
+  "customerService?.wechat",
+  "customerService?.telegram",
+  "customerService?.email",
+  "customerService?.qrCodeUrl",
+  "复制微信",
+  "打开 Telegram",
+  "发送邮件",
+  "客服渠道由 Admin 应用配置驱动"
+]) {
+  includes(pattern, `Dashboard help and customer service contract must include ${pattern}.`);
+}
+
+for (const pattern of [
   ".case-action-layout",
   ".case-action-list",
   ".case-action-detail",
@@ -300,7 +319,11 @@ for (const pattern of [
   ".identity-card",
   ".account-link-list",
   ".share-work-page",
-  ".share-work-layout"
+  ".share-work-layout",
+  ".support-panel",
+  ".support-layout",
+  ".support-card",
+  ".qr-card"
 ]) {
   styleIncludes(pattern, `Dashboard workflow case marketplace styles must include ${pattern}.`);
 }
@@ -323,6 +346,7 @@ console.log(JSON.stringify({
     "Dashboard works library lists, filters, previews, downloads, shares, reruns, deletes and publishes works",
     "Dashboard public gallery reads /gallery/works, shows public details, copies prompts, downloads allowed works and gates same-style generation by login",
     "Dashboard account settings reads /auth/me and credit balance, displays login methods, protocol entries and user-owned identity restrictions",
-    "Dashboard shared work page consumes /works/share/:ticket, downloads with shareTicket and gates same-style generation by login"
+    "Dashboard shared work page consumes /works/share/:ticket, downloads with shareTicket and gates same-style generation by login",
+    "Dashboard help center reads /customer-service and renders WeChat, Telegram, email and QR customer support entries"
   ]
 }, null, 2));

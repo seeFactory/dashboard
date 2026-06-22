@@ -461,6 +461,14 @@ type AuthResult = {
   isNewUser?: boolean;
 };
 
+type CustomerServiceConfig = {
+  wechat?: string;
+  telegram?: string;
+  email?: string;
+  qrCodeUrl?: string;
+  note?: string;
+};
+
 type CurrentUser = {
   id?: string;
   _id?: string;
@@ -608,6 +616,7 @@ function usePublicData() {
   const [galleryWorks, setGalleryWorks] = useState<Work[]>([]);
   const [models, setModels] = useState<ModelCapability[]>([]);
   const [components, setComponents] = useState<ComponentDefinition[]>([]);
+  const [customerService, setCustomerService] = useState<CustomerServiceConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -618,21 +627,24 @@ function usePublicData() {
       settle(apiGet<PageData<CaseContent>>("/case-contents?caseType=workflow&pageSize=8")),
       settle(apiGet<PageData<Work>>("/gallery/works?pageSize=12")),
       settle(apiGet<PageData<ModelCapability>>("/models?pageSize=12")),
-      settle(apiGet<PageData<ComponentDefinition>>("/components?pageSize=100&clientRuntime=h5-google"))
+      settle(apiGet<PageData<ComponentDefinition>>("/components?pageSize=100&clientRuntime=h5-google")),
+      settle(apiGet<CustomerServiceConfig>("/customer-service"))
     ])
-      .then(([toolResult, caseResult, galleryResult, modelResult, componentResult]) => {
+      .then(([toolResult, caseResult, galleryResult, modelResult, componentResult, customerResult]) => {
         if (!mounted) return;
         setTools(toolResult.ok ? toolResult.value : []);
         setCases(caseResult.ok ? caseResult.value.list || [] : []);
         setGalleryWorks(galleryResult.ok ? galleryResult.value.list || [] : []);
         setModels(modelResult.ok ? modelResult.value.list || [] : []);
         setComponents(componentResult.ok ? componentResult.value.list || [] : []);
+        setCustomerService(customerResult.ok ? customerResult.value : null);
         const errors = [
           toolResult.ok ? "" : `工具配置：${toolResult.reason?.message || "加载失败"}`,
           caseResult.ok ? "" : `案例配置：${caseResult.reason?.message || "加载失败"}`,
           galleryResult.ok ? "" : `作品广场：${galleryResult.reason?.message || "加载失败"}`,
           modelResult.ok ? "" : `模型能力：${modelResult.reason?.message || "加载失败"}`,
-          componentResult.ok ? "" : `组件定义：${componentResult.reason?.message || "加载失败"}`
+          componentResult.ok ? "" : `组件定义：${componentResult.reason?.message || "加载失败"}`,
+          customerResult.ok ? "" : `客服配置：${customerResult.reason?.message || "加载失败"}`
         ].filter(Boolean);
         setError(errors.join("；"));
       })
@@ -642,7 +654,7 @@ function usePublicData() {
     };
   }, []);
 
-  return { tools, cases, galleryWorks, models, components, loading, error };
+  return { tools, cases, galleryWorks, models, components, customerService, loading, error };
 }
 
 function Logo() {
@@ -1389,6 +1401,7 @@ function PublicShell({
           <a href="#showcase">作品广场</a>
           <a href="#models">模型</a>
           <a href="#pricing">价格</a>
+          <a href="#help">帮助</a>
         </nav>
         {authed ? (
           <Button variant="ghost" onClick={onOpenDashboard}>
@@ -1826,25 +1839,102 @@ function ModelTable({ models }: { models: ModelCapability[] }) {
   );
 }
 
-function PricingHelp() {
+function telegramLink(value?: string) {
+  const account = String(value || "").trim();
+  if (!account) return "";
+  if (/^https?:\/\//i.test(account)) return account;
+  return `https://t.me/${account.replace(/^@/, "")}`;
+}
+
+function SupportPanel({
+  customerService,
+  onToast,
+  compact = false
+}: {
+  customerService?: CustomerServiceConfig | null;
+  onToast: (toast: Toast) => void;
+  compact?: boolean;
+}) {
+  const wechat = customerService?.wechat || "seeFactory-service";
+  const telegram = customerService?.telegram || "@seeFactorySupport";
+  const email = customerService?.email || "support@seefactory.ai";
+  const note = customerService?.note || "添加客服获取创作建议和充值说明";
+  const copyValue = (label: string, value?: string) => {
+    const text = String(value || "").trim();
+    if (!text) {
+      onToast({ title: `${label} 暂未配置`, tone: "danger" });
+      return;
+    }
+    navigator.clipboard?.writeText(text).catch(() => undefined);
+    onToast({ title: `${label} 已复制`, tone: "success" });
+  };
+
   return (
-    <section id="pricing" className="content-band pricing-grid">
-      <article>
-        <span className="eyebrow">Wallet</span>
-        <h2>PC Dashboard 只接 Crypto</h2>
-        <p>移动端按平台支付，PC H5 复用 Crypto bridge / wallet / payment 体系。</p>
-      </article>
-      <article>
-        <span className="eyebrow">Points</span>
-        <h2>1 CNY = 7 点</h2>
-        <p>模板购买扣模板费，后续运行只扣模型节点点数。Workflow 运行采用预估冻结和实际结算。</p>
-      </article>
-      <article>
-        <span className="eyebrow">Support</span>
-        <h2>帮助入口由 Admin 配置</h2>
-        <p>首期不做工单，只展示客服渠道和跳转链接。页面文案默认全中文。</p>
-      </article>
+    <section id="help" className={compact ? "content-band support-panel compact" : "workspace-section support-panel"}>
+      <div className="section-title-row">
+        <div>
+          <span className="eyebrow">Help center</span>
+          <h2>帮助与客服</h2>
+        </div>
+        <span className="section-note">首期不做工单，客服渠道由 Admin 应用配置驱动</span>
+      </div>
+      <div className="support-layout">
+        <article className="support-card primary">
+          <span>客服说明</span>
+          <h3>{note}</h3>
+          <p>生成失败、充值到账、Workflow 模板购买、公开案例反馈和账号异常，都可以先通过下方渠道联系人工处理。</p>
+        </article>
+        <article className="support-card">
+          <Icon name="copy" />
+          <span>微信客服</span>
+          <strong>{wechat}</strong>
+          <button onClick={() => copyValue("微信客服", wechat)}>复制微信</button>
+        </article>
+        <article className="support-card">
+          <Icon name="telegram" />
+          <span>Telegram</span>
+          <strong>{telegram}</strong>
+          <button onClick={() => openExternalUrl(telegramLink(telegram))}>打开 Telegram</button>
+        </article>
+        <article className="support-card">
+          <Icon name="mail" />
+          <span>邮箱</span>
+          <strong>{email}</strong>
+          <button onClick={() => openExternalUrl(`mailto:${email}`)}>发送邮件</button>
+        </article>
+        {customerService?.qrCodeUrl ? (
+          <article className="support-card qr-card">
+            <img src={customerService.qrCodeUrl} alt="客服二维码" loading="lazy" />
+            <span>客服二维码</span>
+          </article>
+        ) : null}
+      </div>
     </section>
+  );
+}
+
+function PricingHelp({ customerService, onToast }: { customerService?: CustomerServiceConfig | null; onToast: (toast: Toast) => void }) {
+  return (
+    <>
+      <section id="pricing" className="content-band pricing-grid">
+        <article>
+          <span className="eyebrow">Wallet</span>
+          <h2>PC Dashboard 只接 Crypto</h2>
+          <p>移动端按平台支付，PC H5 复用 Crypto bridge / wallet / payment 体系。</p>
+        </article>
+        <article>
+          <span className="eyebrow">Points</span>
+          <h2>1 CNY = 7 点</h2>
+          <p>模板购买扣模板费，后续运行只扣模型节点点数。Workflow 运行采用预估冻结和实际结算。</p>
+        </article>
+        <article>
+          <span className="eyebrow">Support</span>
+          <h2>帮助入口由 Admin 配置</h2>
+          <p>首期不做工单，只展示客服渠道和跳转链接。页面文案默认全中文。</p>
+        </article>
+      </section>
+      <SupportPanel customerService={customerService} onToast={onToast} compact />
+    </>
   );
 }
 
@@ -1871,7 +1961,7 @@ function PublicHome({
       <CaseSquare cases={data.cases} />
       <GalleryPanel tools={data.tools} initialWorks={data.galleryWorks} authed={authed} onLogin={onLogin} onToast={onToast} compact />
       <ModelTable models={data.models} />
-      <PricingHelp />
+      <PricingHelp customerService={data.customerService} onToast={onToast} />
     </>
   );
 }
@@ -1881,6 +1971,7 @@ function DashboardShell({
   cases,
   models,
   components,
+  customerService,
   onLogout,
   onToast
 }: {
@@ -1888,6 +1979,7 @@ function DashboardShell({
   cases: CaseContent[];
   models: ModelCapability[];
   components: ComponentDefinition[];
+  customerService?: CustomerServiceConfig | null;
   onLogout: () => void;
   onToast: (toast: Toast) => void;
 }) {
@@ -1903,6 +1995,7 @@ function DashboardShell({
     ["income", "创作者收益", "wallet"],
     ["runs", "运行记录", "list"],
     ["wallet", "钱包", "wallet"],
+    ["help", "帮助中心", "mail"],
     ["account", "账户", "user"]
   ];
   const title = nav.find(([key]) => key === active)?.[1] || "工作台";
@@ -1945,6 +2038,7 @@ function DashboardShell({
         {active === "income" ? <IncomePanel /> : null}
         {active === "runs" ? <RunsPanel onToast={onToast} /> : null}
         {active === "wallet" ? <WalletPanel onToast={onToast} /> : null}
+        {active === "help" ? <SupportPanel customerService={customerService} onToast={onToast} /> : null}
         {active === "account" ? <AccountPanel onToast={onToast} /> : null}
       </main>
     </div>
@@ -4880,6 +4974,7 @@ function App() {
           cases={data.cases}
           models={data.models}
           components={data.components}
+          customerService={data.customerService}
           onLogout={logout}
           onToast={toastApi}
         />

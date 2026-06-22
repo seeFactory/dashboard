@@ -1612,6 +1612,78 @@ code {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.support-panel {
+  scroll-margin-top: 92px;
+}
+
+.support-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) repeat(3, minmax(180px, 0.8fr));
+  gap: 12px;
+}
+
+.support-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid rgba(154, 178, 212, 0.18);
+  border-radius: 8px;
+  padding: 16px;
+  background: rgba(2, 7, 14, 0.34);
+}
+
+.support-card.primary {
+  border-color: rgba(98, 230, 209, 0.26);
+  background:
+    linear-gradient(135deg, rgba(98, 230, 209, 0.11), rgba(167, 139, 250, 0.08)),
+    rgba(2, 7, 14, 0.34);
+}
+
+.support-card span,
+.support-card p {
+  color: var(--muted);
+}
+
+.support-card h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.support-card p {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.support-card strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.support-card button {
+  min-height: 36px;
+  border: 1px solid rgba(98, 230, 209, 0.28);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--text);
+  cursor: pointer;
+  background: rgba(98, 230, 209, 0.1);
+}
+
+.qr-card {
+  justify-items: start;
+}
+
+.qr-card img {
+  width: 132px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(154, 178, 212, 0.24);
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .state-card {
   display: grid;
   justify-items: center;
@@ -2203,6 +2275,7 @@ code {
   .workspace-grid,
   .works-grid,
   .identity-grid,
+  .support-layout,
   .canvas-lanes,
   .node-config-grid,
   .exposed-fields-grid {
@@ -2250,7 +2323,8 @@ code {
   .exposed-fields-grid,
   .auth-grid,
   .side-nav,
-  .identity-grid {
+  .identity-grid,
+  .support-layout {
     grid-template-columns: 1fr;
   }
 
