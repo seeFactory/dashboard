@@ -309,6 +309,9 @@ type WorkflowRunNode = {
 type Work = {
   id: string;
   generationTaskId?: string;
+  sourceWorkflowVersionId?: string;
+  sourceCaseContentId?: string;
+  generatedByWorkflowRunId?: string;
   toolKey?: string;
   title?: string;
   prompt?: string;
@@ -2400,7 +2403,7 @@ function DashboardShell({
   customerService?: CustomerServiceConfig | null;
   faqs?: FaqItem[];
   active: string;
-  onNavigate: (tab: string) => void;
+  onNavigate: (tab: string, path?: string) => void;
   onLogout: () => void;
   onToast: (toast: Toast) => void;
 }) {
@@ -2450,7 +2453,7 @@ function DashboardShell({
         </header>
         {active === "overview" ? <Overview tools={tools} cases={cases} models={models} components={components} /> : null}
         {active === "create" ? <CreatePanel tools={tools} onToast={onToast} /> : null}
-        {active === "works" ? <WorksPanel tools={tools} onToast={onToast} /> : null}
+        {active === "works" ? <WorksPanel tools={tools} onToast={onToast} onOpenWorkflowCase={(caseId) => onNavigate("cases", workflowCasePath(caseId))} /> : null}
         {active === "showcase" ? <GalleryPanel tools={tools} authed onLogin={() => undefined} onToast={onToast} /> : null}
         {active === "workflow" ? <WorkflowConsole components={components} tools={tools} workflowPolicy={appConfig?.workflowPolicy} onToast={onToast} /> : null}
         {active === "cases" ? <WorkflowCasePanel initialCases={cases} onOpenPurchases={() => onNavigate("purchases")} onToast={onToast} /> : null}
@@ -3056,7 +3059,15 @@ function workTitle(work: Work) {
   return work.title || work.galleryTitle || work.prompt?.slice(0, 32) || "未命名作品";
 }
 
-function WorksPanel({ tools, onToast }: { tools: Tool[]; onToast: (toast: Toast) => void }) {
+function WorksPanel({
+  tools,
+  onToast,
+  onOpenWorkflowCase
+}: {
+  tools: Tool[];
+  onToast: (toast: Toast) => void;
+  onOpenWorkflowCase: (caseId: string) => void;
+}) {
   const [items, setItems] = useState<Work[]>([]);
   const [selectedWork, setSelectedWork] = useState<Work | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
@@ -3293,6 +3304,27 @@ function WorksPanel({ tools, onToast }: { tools: Tool[]; onToast: (toast: Toast)
               {selectedWork.isIntermediateOutput ? <span>中间结果</span> : null}
             </div>
             {selectedWork.lockedUntilPurchase ? <p className="danger-text">该试运行作品需要购买对应 Workflow 后才能下载或发布。</p> : null}
+            {selectedWork.lockedUntilPurchase ? (
+              <div className="locked-work-card">
+                <div>
+                  <strong>试运行作品待解锁</strong>
+                  <p>该作品来自闭源付费 Workflow 试运行。购买对应模板后，可下载、分享并发布到广场。</p>
+                </div>
+                <Button
+                  onClick={() => {
+                    if (!selectedWork.sourceCaseContentId) {
+                      onToast({ title: "缺少对应 Workflow 案例信息", tone: "danger" });
+                      return;
+                    }
+                    onOpenWorkflowCase(selectedWork.sourceCaseContentId);
+                  }}
+                  disabled={!selectedWork.sourceCaseContentId}
+                >
+                  <Icon name="wallet" />
+                  购买解锁
+                </Button>
+              </div>
+            ) : null}
             {selectedWork.failureReason ? <p className="danger-text">{selectedWork.failureReason}</p> : null}
             <div className="work-prompt-panel">
               <span>提示词</span>
@@ -4341,10 +4373,12 @@ function WorkflowCasePanel({
   onOpenPurchases: () => void;
   onToast: (toast: Toast) => void;
 }) {
+  const initialTargetCaseId = currentWorkflowCaseId();
+  const initialTargetCase = initialCases.find((item) => item.id === initialTargetCaseId) || initialCases[0] || null;
   const [items, setItems] = useState<CaseContent[]>(initialCases);
-  const [selectedCase, setSelectedCase] = useState<CaseContent | null>(initialCases[0] || null);
+  const [selectedCase, setSelectedCase] = useState<CaseContent | null>(initialTargetCase);
   const [status, setStatus] = useState<WorkflowPurchaseStatus | null>(null);
-  const [runValues, setRunValues] = useState<Record<string, WorkflowRunValue>>(initialWorkflowRunValues(initialCases[0]?.runForm));
+  const [runValues, setRunValues] = useState<Record<string, WorkflowRunValue>>(initialWorkflowRunValues(initialTargetCase?.runForm));
   const [runUploadState, setRunUploadState] = useState<WorkflowRunUploadState>({});
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -4356,7 +4390,11 @@ function WorkflowCasePanel({
     apiGet<PageData<CaseContent>>("/workflow-cases?pageSize=30", { auth: true })
       .then((data) => {
         const list = data.list || [];
-        const nextCase = selectedCase && list.some((item) => item.id === selectedCase.id) ? selectedCase : list[0] || null;
+        const targetCaseId = currentWorkflowCaseId();
+        const targetCase = targetCaseId
+          ? list.find((item) => item.id === targetCaseId) || ({ id: targetCaseId, title: "正在同步目标案例" } as CaseContent)
+          : null;
+        const nextCase = targetCase || (selectedCase && list.some((item) => item.id === selectedCase.id) ? selectedCase : list[0] || null);
         setItems(list);
         setSelectedCase(nextCase);
         if (nextCase) {
@@ -5375,12 +5413,24 @@ function dashboardPathForTab(tab: string) {
   return dashboardTabRoutes[tab] || dashboardTabRoutes.overview;
 }
 
+function workflowCasePath(caseId?: string) {
+  const path = dashboardTabRoutes.cases;
+  return caseId ? `${path}?caseId=${encodeURIComponent(caseId)}` : path;
+}
+
+function currentWorkflowCaseId() {
+  return new URLSearchParams(window.location.search).get("caseId") || "";
+}
+
 function replaceBrowserPath(path: string) {
   window.history.replaceState({}, "", `${path}${window.location.search}${window.location.hash}`);
 }
 
 function pushBrowserPath(path: string) {
-  if (normalizedPathname() === normalizedPathname(path)) return;
+  const nextUrl = new URL(path, window.location.origin);
+  const currentPath = `${normalizedPathname()}${window.location.search}${window.location.hash}`;
+  const nextPath = `${normalizedPathname(nextUrl.pathname)}${nextUrl.search}${nextUrl.hash}`;
+  if (currentPath === nextPath) return;
   window.history.pushState({}, "", path);
 }
 
@@ -5582,12 +5632,12 @@ function App() {
     window.setTimeout(() => setToast(null), 2400);
   };
 
-  const openDashboard = (tab = dashboardTab, mode: "push" | "replace" = "push") => {
+  const openDashboard = (tab = dashboardTab, mode: "push" | "replace" = "push", pathOverride = "") => {
     const nextTab = tab || "overview";
     setPendingDashboardTab("");
     setDashboardTab(nextTab);
     setView("dashboard");
-    const path = dashboardPathForTab(nextTab);
+    const path = pathOverride || dashboardPathForTab(nextTab);
     if (mode === "replace") {
       replaceBrowserPath(path);
     } else {
@@ -5722,7 +5772,7 @@ function App() {
           customerService={data.customerService}
           faqs={data.faqs}
           active={dashboardTab}
-          onNavigate={(tab) => openDashboard(tab)}
+          onNavigate={(tab, path) => openDashboard(tab, "push", path)}
           onLogout={logout}
           onToast={toastApi}
         />

@@ -163,11 +163,14 @@ for (const pattern of [
   'runs: "/dashboard/workflow-runs"',
   "function dashboardTabFromPath",
   "function dashboardPathForTab",
+  "function workflowCasePath",
+  "function currentWorkflowCaseId",
+  "caseId=${encodeURIComponent(caseId)}",
   "pushBrowserPath(dashboardPathForTab(nextTab))",
   "replaceBrowserPath(dashboardPathForTab(targetTab))",
   "window.addEventListener(\"popstate\", syncRoute)",
   "setPendingDashboardTab(routeTab)",
-  "onNavigate={(tab) => openDashboard(tab)}",
+  "onNavigate={(tab, path) => openDashboard(tab, \"push\", path)}",
   "requestDashboard(\"create\")"
 ]) {
   includes(pattern, `Dashboard protected workspace routing contract must include ${pattern}.`);
@@ -270,6 +273,9 @@ for (const pattern of [
   "buildWorkflowRunPayload(runForm, runValuesById[item.id]",
   "<WorkflowRunFormFields",
   "function WorkflowCasePanel",
+  "currentWorkflowCaseId",
+  "const targetCaseId = currentWorkflowCaseId()",
+  "正在同步目标案例",
   "onOpenPurchases",
   "case-action-layout",
   "workflow-entitlement-card",
@@ -341,6 +347,11 @@ for (const pattern of [
   'apiPost<{ deleted?: number }>("/works/clear-failed"',
   "apiDelete<boolean>(`/works/${work.id}`",
   "lockedUntilPurchase",
+  "sourceCaseContentId?: string",
+  "generatedByWorkflowRunId?: string",
+  "onOpenWorkflowCase",
+  "locked-work-card",
+  "onOpenWorkflowCase(selectedWork.sourceCaseContentId)",
   "work-prompt-panel",
   "params-panel"
 ]) {
@@ -434,6 +445,8 @@ for (const pattern of [
   ".case-action-detail",
   ".workflow-entitlement-card",
   ".workflow-entitlement-card.purchased",
+  ".locked-work-card",
+  ".locked-work-card strong",
   ".workflow-published",
   ".published-case",
   ".lifecycle.listed",
