@@ -1,20 +1,28 @@
 {
-  "name": "@seefactory/dashboard",
-  "private": true,
+  "name": "seefactory-dashboard",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.13.1",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 18182",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 18182"
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "build:prod": "node scripts/build-production.mjs",
+    "preview": "vite preview --host 0.0.0.0",
+    "verify:dashboard-contract": "node scripts/verify-dashboard-contract.mjs",
+    "verify:env-example": "node scripts/verify-env-example.mjs",
+    "verify:production-api": "node scripts/verify-production-api-base.mjs",
+    "verify": "node scripts/build-production.mjs && node scripts/verify-dashboard-contract.mjs && node scripts/verify-env-example.mjs && node scripts/verify-production-api-base.mjs"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.8",
+    "@vitejs/plugin-react": "^4.6.0",
+    "vite": "^6.4.3",
+    "typescript": "^5.9.2",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "@xyflow/react": "^12.6.4",
-    "lucide-react": "^0.468.0"
+    "react-dom": "^18.3.1"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5"
+  }
 }

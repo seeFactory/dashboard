@@ -1,208 +1,181 @@
 # seeFactory Dashboard
 
-## 2026-06-17 更新摘要
+seeFactory Dashboard 是独立的 PC Web 用户工作台，同时承担官网公开态能力。项目使用 `React + Vite + TypeScript + pnpm`，面向普通用户、创作者和高频内容生产者，提供公开浏览、登录创作、作品管理、Workflow 编排、模板市场、点数钱包和 Crypto 充值能力。
 
-- Billing 页面新增微信/支付宝充值渠道选择、自定义充值、优惠券兑换、提现申请、邀请码展示和提现列表。
-- 模型测试台可测试后台映射后的外部 Provider 模型。
-- 操练场继续保存服务端 session，并通过后端统一 runtime 支持对话、生图、生视频和多模态模型。
-- Workflow 发布支持开源/闭源选择、工坊标签和自由定价；创意工坊支持排序、预估、评分、收藏、评论和举报。
-- 创意工坊详情支持按预估费用创建 `workflow_run` 单次支付订单。
+生产站点：
 
-seeFactory Dashboard 是用户侧控制台，面向创作者提供注册登录、操练场、模型测试、充值付费、no-code workflow 构建、创意工坊使用、调用记录、资产库和账号资料管理。它是 seeFactory 平台的核心生产界面，用户可以拖拽组件创建产出链条，将 workflow 保存、运行、导出为单文件，也可以发布到创意工坊。
+```text
+https://seefactory.xyz/
+```
 
-## 功能范围
+生产 API：
 
-- 账号注册、登录、退出、资料维护和密码更新。
-- 总览面板：余额、累计消耗、请求次数、成功任务、最近调用和最近订单。
-- Workflow 控制台：组件拖拽、节点连接、节点配置、保存草稿、校验、运行、发布、开源/闭源授权、自由定价、导入和导出。
-- 操练场：对标 new-api playground，保存服务端会话，支持文生文、图生文、文生图、文生视频、图生视频。
-- 创意工坊：浏览公开样例、热门/最新/收入/评分排序、费用预估、单次支付订单、运行样例、克隆开源 workflow、评分、收藏、评论和举报。
-- 模型测试台：选择平台模型能力并发起测试调用。
-- 付费账单：创建微信/支付宝/手动登记充值订单、查看充值记录、钱包流水和模型扣费。
-- 调用记录：分页搜索任务、查看执行状态、节点级明细、事件流、输入、输出资产和错误信息。
-- 资产库：浏览产物资产，登记外部资产 URL。
-- 账号资料：昵称、邮箱、计费偏好、语言和登录安全。
+```text
+https://api.seefactory.xyz/api/v1
+```
+
+## 当前能力
+
+- 公开首页：工具矩阵、Workflow 案例、公开作品广场、模型能力、价格说明。
+- 登录：PC H5 支持 Google、X、Telegram Login Widget。
+- 普通创作：从后端 `/tools` 渲染工具、模式、字段、素材槽位、比例、分辨率、视频精度和点数消耗。
+- 我的作品：私有作品库、状态/工具筛选、预览、下载、发布/取消发布广场、分享链接、再次生成、删除和失败作品清理。
+- 公开作品广场：读取 `/gallery/works`，支持精选筛选、详情、提示词复制、下载权限和同款创作。
+- 分享页：支持 `/share/:ticket`，读取 `/works/share/:ticket` 并通过 `shareTicket` 下载。
+- Workflow 控制台：组件选择、线性 graph、节点配置、服务端校验、估价、测试运行、发布、导入和导出 `.seeflow`。
+- Workflow 案例：购买、试运行、正式运行、克隆、导出、已购模板库、运行记录和节点输出预览。
+- 钱包：点数余额、冻结点数、点数流水、CNY 自填金额、Crypto bridge 充值订单和支付状态轮询。
+- 账户设置：读取 `/auth/me` 与 `/credits/balance`，展示账户资料、登录方式说明、协议入口和用户端不开放解绑规则。
 
 ## 技术栈
 
 - React 18
-- Vite 5
-- @xyflow/react
-- lucide-react
-- 原生 CSS，新扁平风格，支持亮色/暗色主题
+- Vite 6
+- TypeScript 5
+- pnpm 10
+- 原生 CSS 深色玻璃拟态视觉体系
 
 ## 目录结构
 
 ```text
 .
 ├── public/
-│   └── brand/
-│       └── logo-icon.png
+│   └── logo.png
+├── scripts/
+│   ├── build-production.mjs
+│   ├── verify-dashboard-contract.mjs
+│   ├── verify-env-example.mjs
+│   └── verify-production-api-base.mjs
 ├── src/
-│   ├── main.jsx
-│   └── styles.css
+│   ├── main.tsx
+│   ├── styles.css
+│   └── vite-env.d.ts
+├── .env.example
 ├── index.html
 ├── package.json
-├── vite.config.js
-└── README.md
+├── tsconfig.json
+└── vite.config.ts
 ```
 
-## 环境要求
+## 环境变量
 
-- Node.js 20 或更高版本。
-- seeFactory Backend 已启动，并可通过 `http://<hostname>:18280` 访问。
-
-## 安装
-
-```bash
-npm install
-```
-
-如果在 seeFactory 多端 workspace 根目录安装，也可以使用：
-
-```bash
-npm install --workspace @seefactory/dashboard
-```
-
-## 本地开发
-
-```bash
-npm run dev
-```
-
-默认开发地址：
+复制 `.env.example` 后按环境配置：
 
 ```text
-http://localhost:18182
+VITE_SEEFACTORY_API_BASE=https://api.seefactory.xyz/api/v1
+VITE_SEEFACTORY_GOOGLE_CLIENT_ID=
+VITE_SEEFACTORY_X_REDIRECT_URI=
+VITE_SEEFACTORY_TELEGRAM_BOT_USERNAME=
 ```
 
-Dashboard 会按当前访问页面的 hostname 推导 API 地址：
+生产构建必须使用 `VITE_SEEFACTORY_API_BASE=https://api.seefactory.xyz/api/v1`，产物中不得出现 `localhost`、`127.0.0.1` 或源站 IP API 地址。
 
-```text
-http://<当前页面 hostname>:18280
-```
-
-例如访问 `http://192.168.31.26:18282` 时，前端会请求 `http://192.168.31.26:18280`。
-
-## 构建与预览
+## 开发
 
 ```bash
-npm run build
-npm run preview
+pnpm install
+pnpm dev
 ```
 
-构建产物输出到：
+## 构建
+
+```bash
+pnpm build
+```
+
+## 验证
+
+```bash
+pnpm verify
+```
+
+`pnpm verify` 会执行：
+
+- TypeScript 无类型错误检查。
+- Vite 生产构建。
+- Dashboard 业务契约校验，覆盖公开数据、登录、创作、作品库、广场、分享页、Workflow、钱包和账户设置。
+- `.env.example` 环境变量校验。
+- 生产 API 基址校验，确保产物不包含本地或源站 API 地址。
+
+## 部署
+
+构建产物位于：
 
 ```text
 dist/
 ```
 
-本轮验证命令：
-
-```bash
-npm run build
-```
-
-## Workflow 单文件导入导出
-
-Dashboard 支持将 workflow 导出为单文件 manifest，也支持导入 `.seeflow` / JSON manifest 生成草稿：
+当前服务器部署目录：
 
 ```text
-GET /api/workflows/:id/export
-POST /api/workflows/import
+/www/wwwroot/seefactory.xyz
 ```
 
-导出内容包含 workflow schema、节点、边、运行配置、版本信息和元数据，适合跨环境迁移、归档或上传到创意工坊。
-
-## 操练场
-
-Dashboard 顶部导航包含 `操练场` tab。它不是本地浏览器模拟，而是调用 Backend 的 `/api/playground/*` 接口：
-
-- session、message、run 均由服务端保存。
-- 每次运行会选择平台模型能力，并写入账单或免费调度流水。
-- 文生图会产出图片资产，文生视频/图生视频会产出可追踪的视频任务资产。
-- 图生文和图生视频可以选择用户资产库中的图片资产作为输入。
-
-## 后端依赖
-
-Dashboard 依赖 Backend 的以下能力：
-
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `GET /api/users/me`
-- `PATCH /api/users/me`
-- `PATCH /api/users/me/password`
-- `GET /api/users/me/summary`
-- `GET /api/wallet/balance`
-- `GET /api/wallet/ledgers`
-- `GET /api/payments/recharge-orders`
-- `POST /api/payments/recharge-orders`
-- `GET /api/models/capabilities`
-- `POST /api/models/test`
-- `GET /api/playground/sessions`
-- `POST /api/playground/sessions`
-- `DELETE /api/playground/sessions/:id`
-- `GET /api/playground/sessions/:id/messages`
-- `POST /api/playground/sessions/:id/run`
-- `POST /api/playground/sessions/:id/stop`
-- `GET /api/components`
-- `GET /api/workflows`
-- `POST /api/workflows`
-- `PUT /api/workflows/:id/draft`
-- `POST /api/workflows/:id/validate`
-- `POST /api/workflows/:id/test-run`
-- `POST /api/workflows/:id/publish`
-- `POST /api/workflows/:id/estimate`
-- `GET /api/workflows/:id/export`
-- `POST /api/workflows/import`
-- `GET /api/workshop/items`
-- `GET /api/workshop/items/:id`
-- `GET /api/workshop/items/:id/comments`
-- `POST /api/workshop/items/:id/comments`
-- `POST /api/workshop/items/:id/rating`
-- `POST /api/workshop/items/:id/favorite`
-- `POST /api/workshop/items/:id/report`
-- `GET /api/workshop/items/:id/estimate`
-- `POST /api/workshop/items/:id/run`
-- `POST /api/workshop/items/:id/clone`
-- `GET /api/tasks`
-- `GET /api/tasks/:id`
-- `GET /api/tasks/:id/events`
-- `GET /api/tasks/:id/nodes`
-- `GET /api/assets`
-- `POST /api/assets/upload`
-
-## 设计规范
-
-- 与官网、Admin、Mobile H5 保持同一套 seeFactory 色系。
-- 默认亮色主题，支持暗色主题切换。
-- 工作流区域使用大画布、柔和网格、圆角节点和独立工具条。
-- 所有按钮、输入框、搜索框、分页和导航 icon 使用统一对齐规则。
-
-## 部署建议
-
-- 推荐通过容器或 Nginx 托管 `dist/`。
-- 不建议直接暴露 80/443 给应用容器；平台约定外部端口为 `18282`。
-- 确保 Dashboard 所在域名或 IP 可以访问 Backend 的 `18280` 端口。
-
-## 常见问题
-
-### 登录后接口仍然失败
-
-确认 Backend 已启动，并检查浏览器页面地址是否可以推导出正确 API 地址。例如：
+当前部署脚本：
 
 ```text
-Dashboard: http://192.168.31.26:18282
-API:       http://192.168.31.26:18280
+/tmp/apply-dashboard-deploy.sh
 ```
 
-### Workflow 无法保存
+## 关键接口
 
-确认 Backend 的组件定义已初始化，并且 `/api/components` 可正常返回。workflow 节点必须包含合法 `type`，否则后端会拒绝保存。
+- `GET /tools`
+- `GET /components?pageSize=100&clientRuntime=h5-google`
+- `GET /case-contents?caseType=workflow&pageSize=8`
+- `GET /gallery/works`
+- `GET /gallery/works/:id`
+- `GET /works/share/:ticket`
+- `GET /works`
+- `GET /works/:id`
+- `GET /works/:id/download-url`
+- `POST /works/:id/publish-gallery`
+- `POST /works/:id/unpublish-gallery`
+- `POST /works/:id/share-ticket`
+- `DELETE /works/:id`
+- `POST /works/clear-failed`
+- `POST /generation-tasks`
+- `GET /generation-tasks/:id`
+- `POST /generation-tasks/:id/cancel`
+- `GET /workflows`
+- `POST /workflows`
+- `PUT /workflows/:id/draft`
+- `POST /workflows/:id/validate`
+- `POST /workflows/:id/estimate`
+- `POST /workflows/:id/run`
+- `POST /workflows/:id/publish-case`
+- `GET /workflows/:id/export`
+- `POST /workflows/import`
+- `GET /workflow-cases`
+- `GET /workflow-cases/:id`
+- `GET /workflow-cases/:id/purchase-status`
+- `POST /workflow-cases/:id/purchase`
+- `POST /workflow-cases/:id/trial-run`
+- `POST /workflow-cases/:id/run`
+- `POST /workflow-cases/:id/clone`
+- `GET /workflow-cases/:id/export`
+- `GET /workflow-purchases`
+- `GET /workflow-runs`
+- `GET /workflow-runs/:id`
+- `GET /workflow-runs/:id/nodes`
+- `GET /credits/balance`
+- `GET /credits/recharge-settings`
+- `GET /credits/transactions`
+- `GET /wallet/recharge-options`
+- `POST /credits/recharge-orders`
+- `POST /payments/crypto-orders`
+- `GET /payments/crypto-orders/:id`
+- `GET /auth/me`
+- `POST /auth/h5/google-login`
+- `GET /auth/h5/x/authorize-url`
+- `POST /auth/h5/x-login`
+- `POST /auth/h5/telegram-login`
 
-### 工作流画布显示异常
+## 约束
 
-请确认浏览器加载的是最新构建产物，并清理旧的前端缓存。当前样式对编辑器头部、按钮工具条、画布和节点都有固定尺寸约束。
+- 工具、模型、比例、分辨率、视频精度、点数消耗和素材槽位均以后端配置为准，前端不得写死业务模型。
+- PC Dashboard 只展示 Crypto 充值主路径，不展示微信、支付宝、抖音、QQ 或 Telegram Stars 支付。
+- 用户端不开放登录身份解绑；身份绑定、解绑、恢复和主身份设置由 Admin 审计操作。
+- 未登录用户可浏览公开工具、案例、作品广场、分享页、模型能力和价格说明；生成、同款创作、充值、作品库、下载私有作品等操作按后端鉴权执行。
 
 ## 远端仓库
 
