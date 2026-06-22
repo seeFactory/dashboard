@@ -2405,6 +2405,14 @@ function PublicHome({
   onActionConsumed?: () => void;
 }) {
   const scrollToShowcase = () => document.getElementById("showcase")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const publicSection = publicSectionFromPath();
+  useEffect(() => {
+    if (!publicSection || data.loading) return;
+    window.setTimeout(() => {
+      document.getElementById(publicSection)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }, [data.loading, publicSection]);
+
   return (
     <>
       <Hero appConfig={data.appConfig} tools={data.tools} onStart={onStart} onShowcase={scrollToShowcase} />
@@ -2437,6 +2445,7 @@ function DashboardShell({
   components,
   customerService,
   faqs,
+  rechargePolicy,
   active,
   onNavigate,
   onLogout,
@@ -2449,6 +2458,7 @@ function DashboardShell({
   components: ComponentDefinition[];
   customerService?: CustomerServiceConfig | null;
   faqs?: FaqItem[];
+  rechargePolicy?: RechargePolicy | null;
   active: string;
   onNavigate: (tab: string, path?: string) => void;
   onLogout: () => void;
@@ -2464,6 +2474,8 @@ function DashboardShell({
     ["purchases", "已购模板", "badge"],
     ["income", "创作者收益", "wallet"],
     ["runs", "运行记录", "list"],
+    ["models", "模型能力", "nodes"],
+    ["pricing", "价格说明", "wallet"],
     ["wallet", "钱包", "wallet"],
     ["help", "帮助中心", "mail"],
     ["account", "账户", "user"]
@@ -2507,6 +2519,8 @@ function DashboardShell({
         {active === "purchases" ? <PurchasedTemplates onToast={onToast} /> : null}
         {active === "income" ? <IncomePanel /> : null}
         {active === "runs" ? <RunsPanel onToast={onToast} /> : null}
+        {active === "models" ? <ModelTable models={models} /> : null}
+        {active === "pricing" ? <PricingHelp customerService={customerService} faqs={faqs} rechargePolicy={rechargePolicy} onToast={onToast} /> : null}
         {active === "wallet" ? <WalletPanel onToast={onToast} /> : null}
         {active === "help" ? <SupportPanel customerService={customerService} faqs={faqs} onToast={onToast} /> : null}
         {active === "account" ? <AccountPanel onToast={onToast} /> : null}
@@ -5549,6 +5563,8 @@ const dashboardTabRoutes: Record<string, string> = {
   purchases: "/dashboard/workflow-purchases",
   income: "/dashboard/workflow-income",
   runs: "/dashboard/workflow-runs",
+  models: "/dashboard/models",
+  pricing: "/dashboard/pricing",
   wallet: "/dashboard/wallet",
   help: "/dashboard/help",
   account: "/dashboard/account"
@@ -5565,9 +5581,21 @@ const dashboardRouteTabs: Record<string, string> = Object.entries(dashboardTabRo
     "/dashboard/runs": "runs",
     "/dashboard/income": "income",
     "/dashboard/workflows": "workflow",
-    "/dashboard/workflow": "workflow"
+    "/dashboard/workflow": "workflow",
+    "/dashboard/model-capabilities": "models",
+    "/dashboard/pricing-help": "pricing"
   }
 );
+
+const publicSectionRoutes: Record<string, string> = {
+  "/tools": "tools",
+  "/cases": "cases",
+  "/gallery": "showcase",
+  "/showcase": "showcase",
+  "/models": "models",
+  "/pricing": "pricing",
+  "/help": "help"
+};
 
 function normalizedPathname(pathname = window.location.pathname) {
   const normalized = pathname.replace(/\/+$/, "");
@@ -5580,6 +5608,10 @@ function dashboardTabFromPath(pathname = window.location.pathname) {
 
 function dashboardPathForTab(tab: string) {
   return dashboardTabRoutes[tab] || dashboardTabRoutes.overview;
+}
+
+function publicSectionFromPath(pathname = window.location.pathname) {
+  return publicSectionRoutes[normalizedPathname(pathname)] || "";
 }
 
 function workflowCasePath(caseId?: string) {
@@ -5940,6 +5972,7 @@ function App() {
           components={data.components}
           customerService={data.customerService}
           faqs={data.faqs}
+          rechargePolicy={data.rechargePolicy}
           active={dashboardTab}
           onNavigate={(tab, path) => openDashboard(tab, "push", path)}
           onLogout={logout}
