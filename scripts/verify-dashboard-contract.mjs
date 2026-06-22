@@ -168,6 +168,19 @@ for (const pattern of [
   "const publicSectionRoutes",
   '"/models": "models"',
   '"/pricing": "pricing"',
+  "function decodePathSegment",
+  "function pathSegments",
+  'segments[1] === "tool"',
+  'segments[1] === "works"',
+  'segments[1] === "workflows"',
+  "function currentDashboardToolKey",
+  "function currentDashboardWorkId",
+  "function currentDashboardWorkflowId",
+  "function currentDashboardWorkflowMode",
+  "function currentDashboardPath",
+  "const [pendingDashboardPath, setPendingDashboardPath]",
+  "setPendingDashboardPath(currentDashboardPath())",
+  "replaceBrowserPath(targetPath)",
   "function publicSectionFromPath",
   "document.getElementById(publicSection)?.scrollIntoView",
   "function dashboardTabFromPath",
@@ -175,14 +188,35 @@ for (const pattern of [
   "function workflowCasePath",
   "function currentWorkflowCaseId",
   "caseId=${encodeURIComponent(caseId)}",
-  "pushBrowserPath(dashboardPathForTab(nextTab))",
-  "replaceBrowserPath(dashboardPathForTab(targetTab))",
+  "const path = dashboardPathForTab(nextTab)",
+  "setPendingDashboardPath(path)",
+  "pushBrowserPath(path)",
   "window.addEventListener(\"popstate\", syncRoute)",
   "setPendingDashboardTab(routeTab)",
   "onNavigate={(tab, path) => openDashboard(tab, \"push\", path)}",
   "requestDashboard(\"create\")"
 ]) {
   includes(pattern, `Dashboard protected workspace routing contract must include ${pattern}.`);
+}
+
+for (const pattern of [
+  "initialToolKey={routeToolKey}",
+  "initialWorkId={routeWorkId}",
+  "initialWorkflowId={routeWorkflowId}",
+  "initialRouteMode={routeWorkflowMode}",
+  "function CreatePanel({",
+  "initialToolKey = \"\"",
+  "targetTool.toolKey === selectedToolKey",
+  "function WorksPanel({",
+  "initialWorkId = \"\"",
+  "apiGet<Work>(`/works/${initialWorkId}`",
+  "function WorkflowConsole({",
+  "initialWorkflowId = \"\"",
+  "initialRouteMode = \"editor\"",
+  "apiGet<WorkflowDraft>(`/workflows/${initialWorkflowId}`",
+  "已打开 Workflow 运行入口"
+]) {
+  includes(pattern, `Dashboard dynamic deep-link target selection contract must include ${pattern}.`);
 }
 
 for (const pattern of [
@@ -616,6 +650,7 @@ console.log(JSON.stringify({
     "Dashboard protected workspace tabs are URL-routable and login-gated",
     "Dashboard public pricing/model/help/tool deep links scroll to the matching public section",
     "Dashboard logged-in model and pricing pages are URL-routable",
+    "Dashboard dynamic tool, work and workflow deep links preserve target ids through login",
     "Dashboard workflow draft save and case publish paths are wired",
     "Dashboard workflow publishing consumes backend AppConfig workflowPolicy for price, trial and node limits",
     "Dashboard workflow editor supports component drag-in, draggable node ordering and node config panel",

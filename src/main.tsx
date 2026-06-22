@@ -2464,6 +2464,10 @@ function DashboardShell({
   onLogout: () => void;
   onToast: (toast: Toast) => void;
 }) {
+  const routeToolKey = currentDashboardToolKey();
+  const routeWorkId = currentDashboardWorkId();
+  const routeWorkflowId = currentDashboardWorkflowId();
+  const routeWorkflowMode = currentDashboardWorkflowMode();
   const nav = [
     ["overview", "工作台", "panel"],
     ["create", "创作工具", "image"],
@@ -2511,10 +2515,10 @@ function DashboardShell({
           </Button>
         </header>
         {active === "overview" ? <Overview tools={tools} cases={cases} models={models} components={components} /> : null}
-        {active === "create" ? <CreatePanel tools={tools} onToast={onToast} /> : null}
-        {active === "works" ? <WorksPanel tools={tools} onToast={onToast} onOpenWorkflowCase={(caseId) => onNavigate("cases", workflowCasePath(caseId))} /> : null}
+        {active === "create" ? <CreatePanel tools={tools} initialToolKey={routeToolKey} onToast={onToast} /> : null}
+        {active === "works" ? <WorksPanel tools={tools} initialWorkId={routeWorkId} onToast={onToast} onOpenWorkflowCase={(caseId) => onNavigate("cases", workflowCasePath(caseId))} /> : null}
         {active === "showcase" ? <GalleryPanel tools={tools} authed onLogin={() => undefined} onToast={onToast} /> : null}
-        {active === "workflow" ? <WorkflowConsole components={components} tools={tools} workflowPolicy={appConfig?.workflowPolicy} onToast={onToast} /> : null}
+        {active === "workflow" ? <WorkflowConsole components={components} tools={tools} workflowPolicy={appConfig?.workflowPolicy} initialWorkflowId={routeWorkflowId} initialRouteMode={routeWorkflowMode} onToast={onToast} /> : null}
         {active === "cases" ? <WorkflowCasePanel initialCases={cases} onOpenPurchases={() => onNavigate("purchases")} onToast={onToast} /> : null}
         {active === "purchases" ? <PurchasedTemplates onToast={onToast} /> : null}
         {active === "income" ? <IncomePanel /> : null}
@@ -2756,8 +2760,16 @@ function generationPreviewUrl(task?: GenerationTask | null, work?: Work | null) 
   return work?.resultUrls?.[0] || work?.coverUrl || task?.resultUrls?.[0] || task?.coverUrl || "";
 }
 
-function CreatePanel({ tools, onToast }: { tools: Tool[]; onToast: (toast: Toast) => void }) {
-  const [selectedToolKey, setSelectedToolKey] = useState(() => tools[0]?.toolKey || "");
+function CreatePanel({
+  tools,
+  initialToolKey = "",
+  onToast
+}: {
+  tools: Tool[];
+  initialToolKey?: string;
+  onToast: (toast: Toast) => void;
+}) {
+  const [selectedToolKey, setSelectedToolKey] = useState(() => initialToolKey || tools[0]?.toolKey || "");
   const [selectedModeKey, setSelectedModeKey] = useState("");
   const [values, setValues] = useState<Record<string, WorkflowRunValue>>({});
   const [uploadState, setUploadState] = useState<WorkflowRunUploadState>({});
@@ -2798,6 +2810,18 @@ function CreatePanel({ tools, onToast }: { tools: Tool[]; onToast: (toast: Toast
       setSelectedToolKey(tools[0].toolKey);
     }
   }, [tools, selectedToolKey]);
+
+  useEffect(() => {
+    if (!initialToolKey || !tools.length) return;
+    const targetTool = tools.find((tool) => tool.toolKey === initialToolKey);
+    if (!targetTool || targetTool.toolKey === selectedToolKey) return;
+    const mode = selectedToolMode(targetTool);
+    const modeKey = toolModeKey(mode);
+    setSelectedToolKey(targetTool.toolKey);
+    setSelectedModeKey(modeKey);
+    resetForTool(targetTool, modeKey);
+    loadWorks(targetTool.toolKey);
+  }, [initialToolKey, tools, selectedToolKey]);
 
   useEffect(() => {
     if (!selectedTool) return;
@@ -3122,10 +3146,12 @@ function workTitle(work: Work) {
 
 function WorksPanel({
   tools,
+  initialWorkId = "",
   onToast,
   onOpenWorkflowCase
 }: {
   tools: Tool[];
+  initialWorkId?: string;
   onToast: (toast: Toast) => void;
   onOpenWorkflowCase: (caseId: string) => void;
 }) {
@@ -3149,8 +3175,9 @@ function WorksPanel({
         const list = data.list || [];
         setItems(list);
         setSelectedWork((current) => {
-          if (current && list.some((item) => item.id === current.id)) {
-            return list.find((item) => item.id === current.id) || current;
+          const targetId = initialWorkId || current?.id || "";
+          if (targetId && list.some((item) => item.id === targetId)) {
+            return list.find((item) => item.id === targetId) || current;
           }
           return list[0] || null;
         });
@@ -3161,7 +3188,17 @@ function WorksPanel({
 
   useEffect(() => {
     loadWorks();
-  }, [statusFilter, toolFilter]);
+  }, [statusFilter, toolFilter, initialWorkId]);
+
+  useEffect(() => {
+    if (!initialWorkId || selectedWork?.id === initialWorkId) return;
+    apiGet<Work>(`/works/${initialWorkId}`, { auth: true })
+      .then((work) => {
+        setSelectedWork(work);
+        setItems((current) => current.some((item) => item.id === work.id) ? current.map((item) => item.id === work.id ? work : item) : [work, ...current]);
+      })
+      .catch((err) => onToast({ title: err.message || "作品详情加载失败", tone: "danger" }));
+  }, [initialWorkId, selectedWork?.id]);
 
   const refreshSelected = (workId: string) => {
     return apiGet<Work>(`/works/${workId}`, { auth: true }).then((work) => {
@@ -3728,11 +3765,15 @@ function WorkflowConsole({
   components,
   tools,
   workflowPolicy,
+  initialWorkflowId = "",
+  initialRouteMode = "editor",
   onToast
 }: {
   components: ComponentDefinition[];
   tools: Tool[];
   workflowPolicy?: WorkflowPublishPolicy;
+  initialWorkflowId?: string;
+  initialRouteMode?: "editor" | "run";
   onToast: (toast: Toast) => void;
 }) {
   const [mode, setMode] = useState<"open_free" | "closed_paid">("open_free");
@@ -3991,7 +4032,7 @@ function WorkflowConsole({
     }
   };
 
-  const openWorkflow = (workflow: WorkflowDraft) => {
+  const openWorkflow = (workflow: WorkflowDraft, announce = true) => {
     setDraft(workflow);
     setTitle(workflow.title || "我的 seeFactory Workflow");
     setSummary(workflow.description || "");
@@ -3999,8 +4040,28 @@ function WorkflowConsole({
     setSelectedNodes(restoredNodes);
     setActiveNodeKey(restoredNodes[0]?.nodeKey || "");
     setValidation(null);
-    onToast({ title: `已打开草稿：${workflow.title}`, tone: "info" });
+    if (announce) onToast({ title: `已打开草稿：${workflow.title}`, tone: "info" });
   };
+
+  useEffect(() => {
+    if (!initialWorkflowId || draft?.id === initialWorkflowId) return;
+    const existing = workflows.find((workflow) => workflow.id === initialWorkflowId);
+    if (existing) {
+      openWorkflow(existing, false);
+      return;
+    }
+    setWorkflowLoading(true);
+    apiGet<WorkflowDraft>(`/workflows/${initialWorkflowId}`, { auth: true })
+      .then((workflow) => {
+        openWorkflow(workflow, false);
+        setWorkflows((items) => [workflow, ...items.filter((item) => item.id !== workflow.id)]);
+        if (initialRouteMode === "run") {
+          onToast({ title: "已打开 Workflow 运行入口，请填写测试提示词后提交运行。", tone: "info" });
+        }
+      })
+      .catch((err) => onToast({ title: err instanceof Error ? err.message : "Workflow 草稿详情加载失败", tone: "danger" }))
+      .finally(() => setWorkflowLoading(false));
+  }, [initialWorkflowId, initialRouteMode, draft?.id, workflows, components, tools]);
 
   const stopPublishedCase = async (caseContent: CaseContent) => {
     setPublishedBusyId(caseContent.id);
@@ -5602,12 +5663,52 @@ function normalizedPathname(pathname = window.location.pathname) {
   return normalized || "/";
 }
 
+function decodePathSegment(value = "") {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function pathSegments(pathname = window.location.pathname) {
+  return normalizedPathname(pathname).split("/").filter(Boolean);
+}
+
 function dashboardTabFromPath(pathname = window.location.pathname) {
-  return dashboardRouteTabs[normalizedPathname(pathname)] || "";
+  const normalized = normalizedPathname(pathname);
+  const exact = dashboardRouteTabs[normalized];
+  if (exact) return exact;
+  const segments = pathSegments(normalized);
+  if (segments[0] !== "dashboard") return "";
+  if (segments[1] === "tool" && segments[2]) return "create";
+  if (segments[1] === "works" && segments[2]) return "works";
+  if (segments[1] === "workflows" && segments[2] && ["editor", "run"].includes(segments[3] || "")) return "workflow";
+  return "";
 }
 
 function dashboardPathForTab(tab: string) {
   return dashboardTabRoutes[tab] || dashboardTabRoutes.overview;
+}
+
+function currentDashboardToolKey(pathname = window.location.pathname) {
+  const segments = pathSegments(pathname);
+  return segments[0] === "dashboard" && segments[1] === "tool" && segments[2] ? decodePathSegment(segments[2]) : "";
+}
+
+function currentDashboardWorkId(pathname = window.location.pathname) {
+  const segments = pathSegments(pathname);
+  return segments[0] === "dashboard" && segments[1] === "works" && segments[2] ? decodePathSegment(segments[2]) : "";
+}
+
+function currentDashboardWorkflowId(pathname = window.location.pathname) {
+  const segments = pathSegments(pathname);
+  return segments[0] === "dashboard" && segments[1] === "workflows" && segments[2] ? decodePathSegment(segments[2]) : "";
+}
+
+function currentDashboardWorkflowMode(pathname = window.location.pathname): "editor" | "run" {
+  const segments = pathSegments(pathname);
+  return segments[0] === "dashboard" && segments[1] === "workflows" && segments[3] === "run" ? "run" : "editor";
 }
 
 function publicSectionFromPath(pathname = window.location.pathname) {
@@ -5623,8 +5724,13 @@ function currentWorkflowCaseId() {
   return new URLSearchParams(window.location.search).get("caseId") || "";
 }
 
+function currentDashboardPath() {
+  return `${normalizedPathname()}${window.location.search}${window.location.hash}`;
+}
+
 function replaceBrowserPath(path: string) {
-  window.history.replaceState({}, "", `${path}${window.location.search}${window.location.hash}`);
+  const nextUrl = new URL(path, window.location.origin);
+  window.history.replaceState({}, "", `${normalizedPathname(nextUrl.pathname)}${nextUrl.search}${nextUrl.hash}`);
 }
 
 function pushBrowserPath(path: string) {
@@ -5817,6 +5923,7 @@ function App() {
   const [authed, setAuthed] = useState(() => Boolean(localStorage.getItem(tokenKey)));
   const [dashboardTab, setDashboardTab] = useState(() => dashboardTabFromPath() || "overview");
   const [pendingDashboardTab, setPendingDashboardTab] = useState(() => dashboardTabFromPath());
+  const [pendingDashboardPath, setPendingDashboardPath] = useState(() => (dashboardTabFromPath() ? currentDashboardPath() : ""));
   const [view, setView] = useState<"public" | "dashboard">(() => {
     const initialTab = dashboardTabFromPath();
     return initialTab && !shareTicket && Boolean(localStorage.getItem(tokenKey)) ? "dashboard" : "public";
@@ -5836,6 +5943,7 @@ function App() {
   const openDashboard = (tab = dashboardTab, mode: "push" | "replace" = "push", pathOverride = "") => {
     const nextTab = tab || "overview";
     setPendingDashboardTab("");
+    setPendingDashboardPath("");
     setDashboardTab(nextTab);
     setView("dashboard");
     const path = pathOverride || dashboardPathForTab(nextTab);
@@ -5851,7 +5959,9 @@ function App() {
     setDashboardTab(nextTab);
     if (!authed) {
       setPendingDashboardTab(nextTab);
-      pushBrowserPath(dashboardPathForTab(nextTab));
+      const path = dashboardPathForTab(nextTab);
+      setPendingDashboardPath(path);
+      pushBrowserPath(path);
       setAuthOpen(true);
       return;
     }
@@ -5875,6 +5985,8 @@ function App() {
     setAuthed(true);
     setAuthOpen(false);
     setPendingDashboardTab("");
+    const targetPath = pendingDashboardPath || dashboardPathForTab(targetTab);
+    setPendingDashboardPath("");
     const publicAction = pendingPublicAction || readPendingPublicAction();
     if (publicAction) {
       setPendingPublicAction(publicAction);
@@ -5889,7 +6001,7 @@ function App() {
     }
     setDashboardTab(targetTab);
     setView("dashboard");
-    replaceBrowserPath(dashboardPathForTab(targetTab));
+    replaceBrowserPath(targetPath);
     toastApi({ title: authSuccessText(provider, result), tone: "success" });
   };
 
@@ -5936,9 +6048,11 @@ function App() {
       if (localStorage.getItem(tokenKey)) {
         setView("dashboard");
         setAuthOpen(false);
+        setPendingDashboardPath("");
       } else {
         setView("public");
         setPendingDashboardTab(routeTab);
+        setPendingDashboardPath(currentDashboardPath());
         setAuthOpen(true);
       }
     };
@@ -5951,6 +6065,7 @@ function App() {
     clearPendingPublicAction();
     setAuthed(false);
     setPendingDashboardTab("");
+    setPendingDashboardPath("");
     setPendingPublicAction(null);
     setView("public");
     replaceBrowserPath("/");
