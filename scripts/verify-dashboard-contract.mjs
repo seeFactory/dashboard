@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 const source = readFileSync(resolve("src/main.tsx"), "utf8");
 const styles = readFileSync(resolve("src/styles.css"), "utf8");
 const packageSource = readFileSync(resolve("package.json"), "utf8");
+const html = readFileSync(resolve("index.html"), "utf8");
 
 function git(args) {
   return execFileSync("git", args, {
@@ -25,6 +26,36 @@ for (const asset of ["public/home-bg.mp4", "public/home-bg-poster.jpg"]) {
   assert.ok(existsSync(resolve(asset)), `Dashboard default home media asset must exist: ${asset}.`);
 }
 
+for (const pattern of [
+  '<html lang="zh-CN">',
+  "<title>seeFactory Studio | AI 图像视频创作工作台</title>",
+  'name="description"',
+  "AI 图像、视频和 Workflow 创作工作台",
+  'name="keywords"',
+  'name="robots" content="index,follow"',
+  'name="theme-color" content="#050710"',
+  'name="application-name" content="seeFactory Studio"',
+  'rel="canonical" href="https://seefactory.xyz/"',
+  'rel="icon" type="image/png" href="/logo.png"',
+  'property="og:locale" content="zh_CN"',
+  'property="og:type" content="website"',
+  'property="og:site_name" content="seeFactory"',
+  'property="og:title" content="seeFactory Studio | AI 图像视频创作工作台"',
+  'property="og:url" content="https://seefactory.xyz/"',
+  'property="og:image" content="https://seefactory.xyz/home-bg-poster.jpg"',
+  'name="twitter:card" content="summary_large_image"',
+  'name="twitter:title" content="seeFactory Studio | AI 图像视频创作工作台"',
+  'name="twitter:image" content="https://seefactory.xyz/home-bg-poster.jpg"',
+  'type="application/ld+json"',
+  '"@type": "WebApplication"',
+  '"applicationCategory": "MultimediaApplication"',
+  '"priceCurrency": "CNY"',
+  "1 CNY = 7 点",
+  "Crypto 充值点数"
+]) {
+  htmlIncludes(pattern, `Dashboard public website SEO/share shell must include ${pattern}.`);
+}
+
 function includes(pattern, message) {
   assert.ok(source.includes(pattern), message);
 }
@@ -39,6 +70,10 @@ function styleIncludes(pattern, message) {
 
 function styleExcludes(pattern, message) {
   assert.ok(!styles.includes(pattern), message);
+}
+
+function htmlIncludes(pattern, message) {
+  assert.ok(html.includes(pattern), message);
 }
 
 function styleSection(startMarker, endMarker) {
@@ -458,6 +493,7 @@ console.log(JSON.stringify({
   checked: [
     "Dashboard directory is the real git worktree for seeFactory/dashboard.git",
     "Dashboard tracks pnpm-lock.yaml under pnpm@10.13.1",
+    "Dashboard public shell exposes Chinese SEO, Open Graph, Twitter Card and structured data metadata",
     "Dashboard contains no hardcoded demo tools/models/cases",
     "Dashboard reads AppConfig, tools, cases, models, components and public recharge policy from backend APIs",
     "Dashboard renders empty/error states instead of business-data fallbacks",
