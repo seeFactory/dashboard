@@ -292,8 +292,10 @@ for (const pattern of [
 }
 assert.ok(!source.includes("return fields.length ? fields : [{"), "Dashboard must not invent fallback workflow runForm fields when backend has not exposed them.");
 for (const pattern of [
+  "type WorkflowCreatorIncomeSummary",
   "function summarizeWorkflowIncome",
   "function IncomePanel",
+  'apiGet<WorkflowCreatorIncomeSummary>("/workflow-creator-income/summary"',
   'apiGet<PageData<WorkflowIncome>>("/workflow-creator-income?pageSize=30"',
   "totalIncomePoints",
   "totalPlatformFeePoints",
@@ -301,8 +303,14 @@ for (const pattern of [
   "frozenPoints",
   "availableCount",
   "frozenCount",
+  "purchaseSummary",
+  "runSummary",
+  "caseSummary",
+  "uniqueBuyerCount",
+  "uniqueRunnerCount",
   "income-layout",
   "income-policy-card",
+  "income-insight-grid",
   "income-table"
 ]) {
   includes(pattern, `Dashboard creator income contract must include ${pattern}.`);
@@ -538,6 +546,7 @@ for (const pattern of [
   ".agreement-viewer",
   ".income-layout",
   ".income-policy-card",
+  ".income-insight-grid",
   ".income-table"
 ]) {
   styleIncludes(pattern, `Dashboard workflow case marketplace styles must include ${pattern}.`);

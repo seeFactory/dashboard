@@ -2092,8 +2092,30 @@ code {
   line-height: 1.75;
 }
 
+.income-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.income-insight-grid span {
+  min-height: 36px;
+  padding: 10px;
+  border: 1px solid rgba(154, 178, 212, 0.16);
+  border-radius: 8px;
+  background: rgba(8, 13, 24, 0.34);
+  color: var(--muted);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
 .income-table {
   margin-top: 0;
+}
+
+.income-table .empty-row {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 2fr);
+  color: var(--muted);
 }
 
 .metric-card {
@@ -2620,6 +2642,7 @@ code {
   .pricing-grid,
   .workspace-grid,
   .income-layout,
+  .income-insight-grid,
   .works-grid,
   .identity-grid,
   .support-layout,
@@ -2678,6 +2701,10 @@ code {
   .faq-grid,
   .agreement-link-grid {
     grid-template-columns: 1fr;
+  }
+
+  .income-insight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .gallery-masonry {

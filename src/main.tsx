@@ -390,6 +390,53 @@ type WorkflowIncome = {
   createdAt?: string;
 };
 
+type WorkflowCreatorIncomeSummary = {
+  income?: {
+    recordCount?: number;
+    totalGrossPoints?: number;
+    totalPlatformFeePoints?: number;
+    totalIncomePoints?: number;
+    availablePoints?: number;
+    frozenPoints?: number;
+    availableCount?: number;
+    frozenCount?: number;
+  };
+  purchases?: {
+    totalCount?: number;
+    activeCount?: number;
+    disabledCount?: number;
+    uniqueBuyerCount?: number;
+    totalPricePoints?: number;
+    totalPlatformFeePoints?: number;
+    totalCreatorIncomePoints?: number;
+  };
+  runs?: {
+    totalCount?: number;
+    formalCount?: number;
+    trialCount?: number;
+    successCount?: number;
+    failedCount?: number;
+    activeCount?: number;
+    uniqueRunnerCount?: number;
+    actualPoints?: number;
+  };
+  cases?: {
+    totalCount?: number;
+    listedCount?: number;
+    hiddenCount?: number;
+    disabledCount?: number;
+    openFreeCount?: number;
+    closedPaidCount?: number;
+    totalPurchaseCount?: number;
+    totalRunCount?: number;
+    totalTrialRunCount?: number;
+  };
+  privacy?: {
+    anonymized?: boolean;
+    excludes?: string[];
+  };
+};
+
 type CreditBalance = {
   balance: number;
   frozenBalance?: number;
@@ -4806,41 +4853,65 @@ function summarizeWorkflowIncome(items: WorkflowIncome[]) {
 
 function IncomePanel() {
   const [items, setItems] = useState<WorkflowIncome[]>([]);
+  const [creatorSummary, setCreatorSummary] = useState<WorkflowCreatorIncomeSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const summary = summarizeWorkflowIncome(items);
+  const fallbackSummary = summarizeWorkflowIncome(items);
+  const incomeSummary = creatorSummary?.income || fallbackSummary;
+  const purchaseSummary = creatorSummary?.purchases || {};
+  const runSummary = creatorSummary?.runs || {};
+  const caseSummary = creatorSummary?.cases || {};
 
   useEffect(() => {
-    apiGet<PageData<WorkflowIncome>>("/workflow-creator-income?pageSize=30", { auth: true })
-      .then((data) => {
-        setItems(data.list || []);
+    Promise.all([
+      apiGet<WorkflowCreatorIncomeSummary>("/workflow-creator-income/summary", { auth: true }),
+      apiGet<PageData<WorkflowIncome>>("/workflow-creator-income?pageSize=30", { auth: true })
+    ])
+      .then(([summaryData, incomeData]) => {
+        setCreatorSummary(summaryData);
+        setItems(incomeData.list || []);
         setError("");
       })
-      .catch((err) => setError(err.message || "收益流水加载失败"))
+      .catch((err) => setError(err.message || "创作者收益加载失败"))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <LoadingBlock title="正在同步创作者收益" />;
-  if (error) return <EmptyBlock title="收益流水暂不可用" body={error} />;
-  if (!items.length) return <EmptyBlock title="暂无收益" body="发布闭源付费 Workflow 并产生购买后，收益会先冻结 72 小时。" />;
+  if (error) return <EmptyBlock title="创作者收益暂不可用" body={error} />;
 
   return (
     <div className="workspace-grid income-layout">
       <div className="metric-card">
         <span>应得收益</span>
-        <strong>{formatPoints(summary.totalIncomePoints)}</strong>
+        <strong>{formatPoints(incomeSummary.totalIncomePoints)}</strong>
       </div>
       <div className="metric-card">
         <span>可用点数</span>
-        <strong>{formatPoints(summary.availablePoints)}</strong>
+        <strong>{formatPoints(incomeSummary.availablePoints)}</strong>
       </div>
       <div className="metric-card">
         <span>冻结点数</span>
-        <strong>{formatPoints(summary.frozenPoints)}</strong>
+        <strong>{formatPoints(incomeSummary.frozenPoints)}</strong>
       </div>
       <div className="metric-card">
         <span>平台抽佣</span>
-        <strong>{formatPoints(summary.totalPlatformFeePoints)}</strong>
+        <strong>{formatPoints(incomeSummary.totalPlatformFeePoints)}</strong>
+      </div>
+      <div className="metric-card">
+        <span>模板购买</span>
+        <strong>{formatPoints(purchaseSummary.totalCount)}</strong>
+      </div>
+      <div className="metric-card">
+        <span>运行次数</span>
+        <strong>{formatPoints(runSummary.totalCount)}</strong>
+      </div>
+      <div className="metric-card">
+        <span>购买用户</span>
+        <strong>{formatPoints(purchaseSummary.uniqueBuyerCount)}</strong>
+      </div>
+      <div className="metric-card">
+        <span>已发布案例</span>
+        <strong>{formatPoints(caseSummary.totalCount)}</strong>
       </div>
       <div className="wide-panel income-policy-card">
         <div className="section-title-row">
@@ -4848,25 +4919,39 @@ function IncomePanel() {
             <span className="eyebrow">Creator income</span>
             <h2>创作者平台内收益</h2>
           </div>
-          <span className="section-note">{summary.availableCount} 笔可用 · {summary.frozenCount} 笔冻结</span>
+          <span className="section-note">{formatPoints(incomeSummary.availableCount)} 笔可用 · {formatPoints(incomeSummary.frozenCount)} 笔冻结</span>
         </div>
         <p>闭源 Workflow 模板被购买后，收益先冻结 72 小时；到期后转为可用平台内点数，可用于生成或购买模板，不开放提现、转赠、退款或兑换现金。</p>
+        <div className="income-insight-grid">
+          <span>正式运行 {formatPoints(runSummary.formalCount)} 次</span>
+          <span>试运行 {formatPoints(runSummary.trialCount)} 次</span>
+          <span>成功 {formatPoints(runSummary.successCount)} 次</span>
+          <span>失败 {formatPoints(runSummary.failedCount)} 次</span>
+          <span>公开中 {formatPoints(caseSummary.listedCount)} 个</span>
+          <span>隐藏 {formatPoints(caseSummary.hiddenCount)} 个</span>
+        </div>
+        <p>这里仅展示购买数、运行数、收益和脱敏汇总，不展示运行者输入、上传素材、节点私有输出或私有作品。</p>
       </div>
       <div className="model-table wide-panel income-table">
-      <div className="model-row header">
-        <span>收益</span>
-        <span>平台抽佣</span>
-        <span>状态</span>
-        <span>时间</span>
-      </div>
-      {items.map((item) => (
-        <div className="model-row" key={item.id}>
-          <strong>{formatPoints(item.incomePoints)} 点</strong>
-          <span>{formatPoints(item.platformFeePoints)} 点</span>
-          <span>{item.status === "available" ? "可用" : "冻结中"}</span>
-          <span>{item.status === "available" ? formatDate(item.settledAt) : formatDate(item.frozenUntil)}</span>
+        <div className="model-row header">
+          <span>收益</span>
+          <span>平台抽佣</span>
+          <span>状态</span>
+          <span>时间</span>
         </div>
-      ))}
+        {items.length ? items.map((item) => (
+          <div className="model-row" key={item.id}>
+            <strong>{formatPoints(item.incomePoints)} 点</strong>
+            <span>{formatPoints(item.platformFeePoints)} 点</span>
+            <span>{item.status === "available" ? "可用" : "冻结中"}</span>
+            <span>{item.status === "available" ? formatDate(item.settledAt) : formatDate(item.frozenUntil)}</span>
+          </div>
+        )) : (
+          <div className="model-row empty-row">
+            <span>暂无收益流水</span>
+            <span>发布闭源付费 Workflow 并产生购买后，这里会显示冻结和可用记录。</span>
+          </div>
+        )}
       </div>
     </div>
   );
