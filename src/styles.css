@@ -1567,6 +1567,73 @@ code {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.agreement-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.agreement-link-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agreement-link-grid button {
+  display: grid;
+  gap: 6px;
+  min-height: 74px;
+  border: 1px solid rgba(154, 178, 212, 0.18);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  background: rgba(2, 7, 14, 0.34);
+}
+
+.agreement-link-grid button.active,
+.agreement-link-grid button:hover {
+  border-color: rgba(98, 230, 209, 0.42);
+  background: rgba(98, 230, 209, 0.08);
+}
+
+.agreement-link-grid button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.agreement-link-grid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.agreement-viewer {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(98, 230, 209, 0.22);
+  border-radius: 8px;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(98, 230, 209, 0.08), transparent 44%),
+    rgba(2, 7, 14, 0.38);
+}
+
+.agreement-viewer h3 {
+  margin: 6px 0 0;
+}
+
+.agreement-viewer pre {
+  max-height: min(52vh, 560px);
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.75;
+}
+
 .share-work-page {
   margin-top: 24px;
 }
@@ -2276,6 +2343,7 @@ code {
   .works-grid,
   .identity-grid,
   .support-layout,
+  .agreement-link-grid,
   .canvas-lanes,
   .node-config-grid,
   .exposed-fields-grid {
@@ -2324,7 +2392,8 @@ code {
   .auth-grid,
   .side-nav,
   .identity-grid,
-  .support-layout {
+  .support-layout,
+  .agreement-link-grid {
     grid-template-columns: 1fr;
   }
 

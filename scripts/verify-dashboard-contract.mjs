@@ -229,7 +229,7 @@ for (const pattern of [
   "X OAuth2 PKCE",
   "Telegram Login Widget",
   "复制用户 ID",
-  "协议与安全"
+  "协议与规则"
 ]) {
   includes(pattern, `Dashboard account settings contract must include ${pattern}.`);
 }
@@ -251,7 +251,10 @@ for (const pattern of [
 for (const pattern of [
   '["help", "帮助中心", "mail"]',
   "type CustomerServiceConfig",
+  "type AgreementType",
+  "type Agreement",
   "function SupportPanel",
+  "function AgreementLinks",
   "function telegramLink",
   "customerService?.wechat",
   "customerService?.telegram",
@@ -260,9 +263,16 @@ for (const pattern of [
   "复制微信",
   "打开 Telegram",
   "发送邮件",
-  "客服渠道由 Admin 应用配置驱动"
+  "客服渠道由 Admin 应用配置驱动",
+  "`/agreements/${type}`",
+  "协议正文由 Admin 发布",
+  "打开外部协议链接",
+  "用户协议",
+  "隐私政策",
+  "创作者协议",
+  "代理说明"
 ]) {
-  includes(pattern, `Dashboard help and customer service contract must include ${pattern}.`);
+  includes(pattern, `Dashboard help, agreements and customer service contract must include ${pattern}.`);
 }
 
 for (const pattern of [
@@ -323,7 +333,10 @@ for (const pattern of [
   ".support-panel",
   ".support-layout",
   ".support-card",
-  ".qr-card"
+  ".qr-card",
+  ".agreement-panel",
+  ".agreement-link-grid",
+  ".agreement-viewer"
 ]) {
   styleIncludes(pattern, `Dashboard workflow case marketplace styles must include ${pattern}.`);
 }
@@ -347,6 +360,7 @@ console.log(JSON.stringify({
     "Dashboard public gallery reads /gallery/works, shows public details, copies prompts, downloads allowed works and gates same-style generation by login",
     "Dashboard account settings reads /auth/me and credit balance, displays login methods, protocol entries and user-owned identity restrictions",
     "Dashboard shared work page consumes /works/share/:ticket, downloads with shareTicket and gates same-style generation by login",
-    "Dashboard help center reads /customer-service and renders WeChat, Telegram, email and QR customer support entries"
+    "Dashboard help center reads /customer-service and renders WeChat, Telegram, email and QR customer support entries",
+    "Dashboard agreement links read /agreements/:type and render published agreement markdown from Admin"
   ]
 }, null, 2));

@@ -469,6 +469,21 @@ type CustomerServiceConfig = {
   note?: string;
 };
 
+type AgreementType = "user" | "privacy" | "creator" | "agent";
+
+type Agreement = {
+  id: string;
+  type: AgreementType;
+  title: string;
+  version: string;
+  contentMarkdown: string;
+  externalUrl?: string;
+  status?: string;
+  publishedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 type CurrentUser = {
   id?: string;
   _id?: string;
@@ -1909,7 +1924,80 @@ function SupportPanel({
           </article>
         ) : null}
       </div>
+      <AgreementLinks onToast={onToast} />
     </section>
+  );
+}
+
+const agreementTypes: Array<{ type: AgreementType; label: string; note: string }> = [
+  { type: "user", label: "用户协议", note: "平台基础使用、账户和内容规则" },
+  { type: "privacy", label: "隐私政策", note: "个人信息、登录身份和数据处理说明" },
+  { type: "creator", label: "创作者协议", note: "Workflow 发布、开源/闭源和收益规则" },
+  { type: "agent", label: "代理说明", note: "代理关系、邀请和平台内收益说明" }
+];
+
+function AgreementLinks({ onToast }: { onToast: (toast: Toast) => void }) {
+  const [selectedType, setSelectedType] = useState<AgreementType>("user");
+  const [agreement, setAgreement] = useState<Agreement | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadAgreement = (type: AgreementType) => {
+    setSelectedType(type);
+    setLoading(true);
+    setError("");
+    apiGet<Agreement>(`/agreements/${type}`)
+      .then((data) => {
+        setAgreement(data);
+        onToast({ title: `${data.title || agreementTypes.find((item) => item.type === type)?.label || "协议"} 已打开`, tone: "info" });
+      })
+      .catch((err) => {
+        const message = err.message || "协议暂未发布";
+        setAgreement(null);
+        setError(message);
+        onToast({ title: message, tone: "danger" });
+      })
+      .finally(() => setLoading(false));
+  };
+
+  return (
+    <div className="agreement-panel">
+      <div className="section-title-row">
+        <div>
+          <span className="eyebrow">Agreements</span>
+          <h2>协议与规则</h2>
+        </div>
+        <span className="section-note">协议正文由 Admin 发布，Dashboard 只读取已发布版本</span>
+      </div>
+      <div className="agreement-link-grid">
+        {agreementTypes.map((item) => (
+          <button key={item.type} className={selectedType === item.type ? "active" : ""} onClick={() => loadAgreement(item.type)} disabled={loading}>
+            <strong>{item.label}</strong>
+            <span>{item.note}</span>
+          </button>
+        ))}
+      </div>
+      {loading ? <LoadingBlock title="正在读取协议正文" /> : null}
+      {error ? <p className="danger-text">{error}</p> : null}
+      {agreement ? (
+        <article className="agreement-viewer">
+          <div className="section-title-row">
+            <div>
+              <span className="eyebrow">{agreement.type}</span>
+              <h3>{agreement.title}</h3>
+            </div>
+            <span className="section-note">版本 {agreement.version || "--"} · {formatDate(agreement.publishedAt || agreement.updatedAt)}</span>
+          </div>
+          <pre>{agreement.contentMarkdown || "该协议暂无正文。"}</pre>
+          {agreement.externalUrl ? (
+            <Button variant="ghost" onClick={() => openExternalUrl(agreement.externalUrl)}>
+              <Icon name="view" />
+              打开外部协议链接
+            </Button>
+          ) : null}
+        </article>
+      ) : null}
+    </div>
   );
 }
 
@@ -4728,19 +4816,7 @@ function AccountPanel({ onToast }: { onToast: (toast: Toast) => void }) {
       </div>
 
       <div className="wide-panel">
-        <div className="section-title-row">
-          <div>
-            <span className="eyebrow">Agreements</span>
-            <h2>协议与安全</h2>
-          </div>
-          <span className="section-note">全中文展示，链接后续可由 Admin 配置</span>
-        </div>
-        <div className="account-link-list">
-          <span>用户协议</span>
-          <span>隐私政策</span>
-          <span>点数规则</span>
-          <span>Workflow 模板购买说明</span>
-        </div>
+        <AgreementLinks onToast={onToast} />
       </div>
     </div>
   );
