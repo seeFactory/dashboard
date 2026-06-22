@@ -904,6 +904,39 @@ code {
   padding: 18px;
 }
 
+.workflow-entitlement-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid rgba(154, 178, 212, 0.2);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 14px 0;
+  background:
+    linear-gradient(135deg, rgba(118, 142, 255, 0.1), transparent 48%),
+    rgba(255, 255, 255, 0.045);
+}
+
+.workflow-entitlement-card.purchased {
+  border-color: rgba(98, 230, 209, 0.34);
+  background:
+    linear-gradient(135deg, rgba(98, 230, 209, 0.12), transparent 46%),
+    rgba(255, 255, 255, 0.045);
+}
+
+.workflow-entitlement-card strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text);
+}
+
+.workflow-entitlement-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
 .run-prompt-field {
   display: grid;
   gap: 8px;

@@ -2453,7 +2453,7 @@ function DashboardShell({
         {active === "works" ? <WorksPanel tools={tools} onToast={onToast} /> : null}
         {active === "showcase" ? <GalleryPanel tools={tools} authed onLogin={() => undefined} onToast={onToast} /> : null}
         {active === "workflow" ? <WorkflowConsole components={components} tools={tools} workflowPolicy={appConfig?.workflowPolicy} onToast={onToast} /> : null}
-        {active === "cases" ? <WorkflowCasePanel initialCases={cases} onToast={onToast} /> : null}
+        {active === "cases" ? <WorkflowCasePanel initialCases={cases} onOpenPurchases={() => onNavigate("purchases")} onToast={onToast} /> : null}
         {active === "purchases" ? <PurchasedTemplates onToast={onToast} /> : null}
         {active === "income" ? <IncomePanel /> : null}
         {active === "runs" ? <RunsPanel onToast={onToast} /> : null}
@@ -4332,7 +4332,15 @@ function WorkflowConsole({
   );
 }
 
-function WorkflowCasePanel({ initialCases, onToast }: { initialCases: CaseContent[]; onToast: (toast: Toast) => void }) {
+function WorkflowCasePanel({
+  initialCases,
+  onOpenPurchases,
+  onToast
+}: {
+  initialCases: CaseContent[];
+  onOpenPurchases: () => void;
+  onToast: (toast: Toast) => void;
+}) {
   const [items, setItems] = useState<CaseContent[]>(initialCases);
   const [selectedCase, setSelectedCase] = useState<CaseContent | null>(initialCases[0] || null);
   const [status, setStatus] = useState<WorkflowPurchaseStatus | null>(null);
@@ -4492,6 +4500,30 @@ function WorkflowCasePanel({ initialCases, onToast }: { initialCases: CaseConten
               <span>试运行 {status?.trialRemaining ?? selectedCase.trialRemaining ?? 0} 次</span>
               <span>购买 {selectedCase.purchaseCount || 0}</span>
               <span>克隆 {selectedCase.cloneCount || 0}</span>
+            </div>
+            <div className={status?.purchased ? "workflow-entitlement-card purchased" : "workflow-entitlement-card"}>
+              <div>
+                <strong>
+                  {selectedCase.licenseMode === "closed_paid"
+                    ? status?.purchased
+                      ? "已购买该 Workflow"
+                      : "购买后权益"
+                    : "开源免费权益"}
+                </strong>
+                <p>
+                  {selectedCase.licenseMode === "closed_paid"
+                    ? status?.purchased
+                      ? "你已获得该发布版本的永久运行权，历史试运行作品会自动解锁下载和发布；购买不包含 graph、克隆或导出权限。"
+                      : "购买后获得该发布版本的永久运行权；后续运行仍按模型节点扣点，不会开放 graph、克隆或 .seeflow 导出。"
+                    : "开源免费案例允许登录后运行、克隆为私有草稿，并导出公开 .seeflow。"}
+                </p>
+              </div>
+              {selectedCase.licenseMode === "closed_paid" && status?.purchased ? (
+                <Button variant="ghost" onClick={onOpenPurchases}>
+                  <Icon name="badge" />
+                  进入已购模板库
+                </Button>
+              ) : null}
             </div>
             {detailLoading ? <LoadingBlock title="正在同步案例权益" /> : null}
             {!canRun && status ? <p className="danger-text">{workflowBlockedReason(status) || "该 Workflow 当前不可运行。"}</p> : null}
