@@ -1821,12 +1821,17 @@ function GalleryPanel({
 
   const downloadGalleryWork = (work: Work | null) => {
     if (!work?.id) return;
+    if (!authed) {
+      onLogin();
+      onToast({ title: "请先登录后再下载作品", tone: "info" });
+      return;
+    }
     if (work.downloadEnabled === false) {
       onToast({ title: "该公开作品已关闭下载权限", tone: "danger" });
       return;
     }
     setBusy(`download:${work.id}`);
-    apiGet<DownloadUrl>(`/works/${work.id}/download-url`, { auth: authed })
+    apiGet<DownloadUrl>(`/works/${work.id}/download-url`, { auth: true })
       .then((data) => {
         if (data.url) {
           openExternalUrl(data.url);
@@ -5256,12 +5261,17 @@ function ShareWorkPage({
 
   const downloadSharedWork = () => {
     if (!work?.id) return;
+    if (!authed) {
+      onLogin();
+      onToast({ title: "请先登录后再下载作品", tone: "info" });
+      return;
+    }
     if (work.downloadEnabled === false) {
       onToast({ title: "该分享作品已关闭下载权限", tone: "danger" });
       return;
     }
     setBusy("download");
-    apiGet<DownloadUrl>(`/works/${work.id}/download-url?shareTicket=${encodeURIComponent(ticket)}`, { auth: authed })
+    apiGet<DownloadUrl>(`/works/${work.id}/download-url?shareTicket=${encodeURIComponent(ticket)}`, { auth: true })
       .then((data) => {
         if (data.url) {
           openExternalUrl(data.url);
