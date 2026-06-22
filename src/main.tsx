@@ -417,6 +417,8 @@ type WorkflowPublishPolicy = {
   maxConcurrentRunsPerUser?: number;
   runTimeoutMinutes?: number;
   nodeRetryMax?: number;
+  publishMaxPerDay?: number;
+  publishMaxTotal?: number;
   publishLimitPolicyRef?: string;
 };
 
