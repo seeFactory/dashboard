@@ -2291,6 +2291,20 @@ code {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.workflow-drop-zone {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.workflow-drop-zone.active {
+  border-color: rgba(98, 230, 209, 0.54);
+  background:
+    linear-gradient(135deg, rgba(98, 230, 209, 0.08), rgba(118, 142, 255, 0.05)),
+    rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(98, 230, 209, 0.16);
+}
+
 .canvas-lanes {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 20px 0;

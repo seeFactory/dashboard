@@ -3645,7 +3645,9 @@ function WorkflowConsole({
   const [mode, setMode] = useState<"open_free" | "closed_paid">("open_free");
   const [selectedNodes, setSelectedNodes] = useState<WorkflowEditorNode[]>([]);
   const [activeNodeKey, setActiveNodeKey] = useState("");
+  const [dragComponentKey, setDragComponentKey] = useState("");
   const [dragNodeKey, setDragNodeKey] = useState("");
+  const [canvasDropActive, setCanvasDropActive] = useState(false);
   const [draft, setDraft] = useState<WorkflowDraft | null>(null);
   const [title, setTitle] = useState("我的 seeFactory Workflow");
   const [summary, setSummary] = useState("把常用多步骤创作链路沉淀为可复用 Workflow。");
@@ -3698,7 +3700,7 @@ function WorkflowConsole({
   const workflowNodeLimit = Number.isFinite(Number(workflowPolicy?.maxGraphNodes)) ? Math.max(1, Number(workflowPolicy?.maxGraphNodes)) : 0;
   const commissionRatePercent = Number.isFinite(Number(workflowPolicy?.commissionRate)) ? Math.round(Number(workflowPolicy?.commissionRate) * 100) : undefined;
 
-  const addComponent = (component: ComponentDefinition) => {
+  const insertComponent = (component: ComponentDefinition, index?: number) => {
     setSelectedNodes((current) => {
       if (workflowNodeLimit && current.length >= workflowNodeLimit) {
         onToast({ title: `当前发布策略最多允许 ${workflowNodeLimit} 个节点。`, tone: "info" });
@@ -3706,9 +3708,16 @@ function WorkflowConsole({
       }
       const nextNode = createEditorNode(component);
       setActiveNodeKey(nextNode.nodeKey);
-      return [...current, nextNode];
+      const next = [...current];
+      const target = typeof index === "number" ? Math.max(0, Math.min(index, next.length)) : next.length;
+      next.splice(target, 0, nextNode);
+      return next;
     });
     setValidation(null);
+  };
+
+  const addComponent = (component: ComponentDefinition) => {
+    insertComponent(component);
   };
 
   const removeNode = (nodeKey: string) => {
@@ -3748,6 +3757,28 @@ function WorkflowConsole({
     });
     setDragNodeKey("");
     setValidation(null);
+  };
+
+  const handleCanvasDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!dragComponentKey) return;
+    event.preventDefault();
+    setCanvasDropActive(true);
+  };
+
+  const handleCanvasDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!dragComponentKey) return;
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setCanvasDropActive(false);
+  };
+
+  const handleCanvasDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!dragComponentKey) return;
+    event.preventDefault();
+    const component = components.find((item) => item.componentKey === dragComponentKey);
+    setCanvasDropActive(false);
+    setDragComponentKey("");
+    if (!component) return;
+    insertComponent(component);
   };
 
   const persistDraft = async () => {
@@ -3969,7 +4000,16 @@ function WorkflowConsole({
         <h2>组件</h2>
         {components.length ? (
           components.map((component) => (
-            <button key={component.componentKey} onClick={() => addComponent(component)}>
+            <button
+              key={component.componentKey}
+              draggable
+              onClick={() => addComponent(component)}
+              onDragStart={() => setDragComponentKey(component.componentKey)}
+              onDragEnd={() => {
+                setDragComponentKey("");
+                setCanvasDropActive(false);
+              }}
+            >
               <Icon name="nodes" />
               <span>{componentTitle(component)}</span>
               <small>{componentCategoryLabel(component)}</small>
@@ -4124,6 +4164,12 @@ function WorkflowConsole({
           ) : null}
         </div>
 
+        <div
+          className={canvasDropActive ? "workflow-drop-zone active" : "workflow-drop-zone"}
+          onDragOver={handleCanvasDragOver}
+          onDragLeave={handleCanvasDragLeave}
+          onDrop={handleCanvasDrop}
+        >
         {selectedNodes.length ? (
           <div className="canvas-lanes">
             {selectedNodes.map((node, index) => {
@@ -4163,6 +4209,7 @@ function WorkflowConsole({
         ) : (
           <EmptyBlock title="画布等待组件配置" body="Dashboard 不会在前端硬编码节点，组件库需由后端 /components 下发。" />
         )}
+        </div>
 
         {activeNode ? (
           <div className="node-config-panel">
