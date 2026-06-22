@@ -405,6 +405,21 @@ type RechargePolicy = {
   allowPayPerGeneration?: boolean;
 };
 
+type WorkflowPublishPolicy = {
+  priceMinPoints?: number;
+  priceMaxPoints?: number;
+  trialLimitMaxPerUser?: number;
+  commissionRate?: number;
+  maxGraphNodes?: number;
+  maxGraphModelNodes?: number;
+  maxLinearSteps?: number;
+  maxLinearModelNodes?: number;
+  maxConcurrentRunsPerUser?: number;
+  runTimeoutMinutes?: number;
+  nodeRetryMax?: number;
+  publishLimitPolicyRef?: string;
+};
+
 type PublicAppConfig = {
   brand?: {
     name?: string;
@@ -430,6 +445,7 @@ type PublicAppConfig = {
   customer?: Record<string, unknown>;
   legal?: Record<string, unknown>;
   generation?: Record<string, unknown>;
+  workflowPolicy?: WorkflowPublishPolicy;
 };
 
 type CryptoTokenOption = {
@@ -2337,7 +2353,7 @@ function DashboardShell({
         {active === "create" ? <CreatePanel tools={tools} onToast={onToast} /> : null}
         {active === "works" ? <WorksPanel tools={tools} onToast={onToast} /> : null}
         {active === "showcase" ? <GalleryPanel tools={tools} authed onLogin={() => undefined} onToast={onToast} /> : null}
-        {active === "workflow" ? <WorkflowConsole components={components} tools={tools} onToast={onToast} /> : null}
+        {active === "workflow" ? <WorkflowConsole components={components} tools={tools} workflowPolicy={appConfig?.workflowPolicy} onToast={onToast} /> : null}
         {active === "cases" ? <WorkflowCasePanel initialCases={cases} onToast={onToast} /> : null}
         {active === "purchases" ? <PurchasedTemplates onToast={onToast} /> : null}
         {active === "income" ? <IncomePanel /> : null}
@@ -3432,15 +3448,27 @@ function buildWorkflowRunForm(selectedNodes: WorkflowEditorNode[]) {
   };
 }
 
-function validateWorkflowGraph(graph: WorkflowGraph, mode: "open_free" | "closed_paid", pricePoints: number): WorkflowValidation {
+function validateWorkflowGraph(graph: WorkflowGraph, mode: "open_free" | "closed_paid", pricePoints: number, policy?: WorkflowPublishPolicy): WorkflowValidation {
   const errors: string[] = [];
   const warnings: string[] = [];
   const executableNodes = graph.nodes.filter((node) => String(node.toolKey || (node.config as any)?.toolKey || "").trim());
   if (!graph.nodes.length) errors.push("请先从左侧添加至少一个组件。");
   if (!executableNodes.length) errors.push("Workflow 至少需要一个可执行生成节点，并且节点必须能映射到后端工具。");
+  if (policy?.maxGraphNodes && graph.nodes.length > policy.maxGraphNodes) errors.push(`当前 Workflow 最多允许 ${policy.maxGraphNodes} 个节点。`);
+  if (policy?.maxGraphModelNodes && executableNodes.length > policy.maxGraphModelNodes) errors.push(`当前 Workflow 最多允许 ${policy.maxGraphModelNodes} 个 AI 模型节点。`);
   const missingModels = graph.nodes.filter((node) => !String(node.modelKey || (node.config as any)?.modelKey || "").trim());
   if (missingModels.length) warnings.push(`${missingModels.length} 个节点未绑定模型，将依赖工具默认模型或后端校验。`);
-  if (mode === "closed_paid" && (!Number.isFinite(pricePoints) || pricePoints < 1)) errors.push("闭源付费 Workflow 的模板售价必须大于 0 点。");
+  if (mode === "closed_paid") {
+    const minPrice = Number(policy?.priceMinPoints);
+    const maxPrice = Number(policy?.priceMaxPoints);
+    if (!Number.isFinite(pricePoints) || pricePoints < 1) {
+      errors.push("闭源付费 Workflow 的模板售价必须大于 0 点。");
+    } else if (Number.isFinite(minPrice) && pricePoints < minPrice) {
+      errors.push(`闭源付费 Workflow 售价不能低于 ${minPrice} 点。`);
+    } else if (Number.isFinite(maxPrice) && pricePoints > maxPrice) {
+      errors.push(`闭源付费 Workflow 售价不能高于 ${maxPrice} 点。`);
+    }
+  }
   return {
     valid: errors.length === 0,
     errors,
@@ -3507,10 +3535,12 @@ function safeFileStem(value: string) {
 function WorkflowConsole({
   components,
   tools,
+  workflowPolicy,
   onToast
 }: {
   components: ComponentDefinition[];
   tools: Tool[];
+  workflowPolicy?: WorkflowPublishPolicy;
   onToast: (toast: Toast) => void;
 }) {
   const [mode, setMode] = useState<"open_free" | "closed_paid">("open_free");
@@ -3549,13 +3579,18 @@ function WorkflowConsole({
   }, []);
 
   const graph = buildWorkflowGraph(selectedNodes, tools);
-  const currentValidation = validation || validateWorkflowGraph(graph, mode, pricePoints);
+  const currentValidation = validation || validateWorkflowGraph(graph, mode, pricePoints, workflowPolicy);
   const activeNode = selectedNodes.find((node) => node.nodeKey === activeNodeKey) || selectedNodes[0] || null;
+  const priceMinPoints = Math.max(1, Number(workflowPolicy?.priceMinPoints || 1));
+  const priceMaxPoints = Number.isFinite(Number(workflowPolicy?.priceMaxPoints)) ? Math.max(priceMinPoints, Number(workflowPolicy?.priceMaxPoints)) : undefined;
+  const trialLimitMaxPerUser = Math.max(0, Number(workflowPolicy?.trialLimitMaxPerUser ?? 0));
+  const workflowNodeLimit = Number.isFinite(Number(workflowPolicy?.maxGraphNodes)) ? Math.max(1, Number(workflowPolicy?.maxGraphNodes)) : 0;
+  const commissionRatePercent = Number.isFinite(Number(workflowPolicy?.commissionRate)) ? Math.round(Number(workflowPolicy?.commissionRate) * 100) : undefined;
 
   const addComponent = (component: ComponentDefinition) => {
     setSelectedNodes((current) => {
-      if (current.length >= 8) {
-        onToast({ title: "首期最多编排 8 个节点，小程序线性链也按 8 步限制展示。", tone: "info" });
+      if (workflowNodeLimit && current.length >= workflowNodeLimit) {
+        onToast({ title: `当前发布策略最多允许 ${workflowNodeLimit} 个节点。`, tone: "info" });
         return current;
       }
       const nextNode = createEditorNode(component);
@@ -3637,7 +3672,7 @@ function WorkflowConsole({
   const saveDraft = async () => {
     setBusy("save");
     try {
-      const nextValidation = validateWorkflowGraph(graph, mode, pricePoints);
+      const nextValidation = validateWorkflowGraph(graph, mode, pricePoints, workflowPolicy);
       setValidation(nextValidation);
       if (!nextValidation.valid) {
         onToast({ title: nextValidation.errors[0] || "Workflow 校验未通过", tone: "danger" });
@@ -3660,7 +3695,7 @@ function WorkflowConsole({
   const validateDraft = async () => {
     setBusy("validate");
     try {
-      const nextValidation = validateWorkflowGraph(graph, mode, pricePoints);
+      const nextValidation = validateWorkflowGraph(graph, mode, pricePoints, workflowPolicy);
       setValidation(nextValidation);
       if (!nextValidation.valid) {
         onToast({ title: nextValidation.errors[0] || "Workflow 校验未通过", tone: "danger" });
@@ -3683,9 +3718,12 @@ function WorkflowConsole({
   const publishWorkflow = async () => {
     setBusy("publish");
     try {
-      const nextValidation = validateWorkflowGraph(graph, mode, pricePoints);
+      const nextValidation = validateWorkflowGraph(graph, mode, pricePoints, workflowPolicy);
       setValidation(nextValidation);
       if (!nextValidation.valid) throw new Error(nextValidation.errors[0] || "Workflow 校验未通过");
+      if (mode === "closed_paid" && trialLimitPerUser > trialLimitMaxPerUser) {
+        throw new Error(`购买前试运行次数不能超过 ${trialLimitMaxPerUser} 次。`);
+      }
       const saved = await persistDraft();
       const serverValidation = await validateAndEstimateServerDraft(saved.id);
       setValidation(serverValidation);
@@ -3774,7 +3812,7 @@ function WorkflowConsole({
     }
     setBusy("run");
     try {
-      const nextValidation = validateWorkflowGraph(graph, mode, pricePoints);
+      const nextValidation = validateWorkflowGraph(graph, mode, pricePoints, workflowPolicy);
       setValidation(nextValidation);
       if (!nextValidation.valid) throw new Error(nextValidation.errors[0] || "Workflow 校验未通过");
       const saved = await persistDraft();
@@ -3906,11 +3944,16 @@ function WorkflowConsole({
             <>
               <label>
                 <span>模板售价点数</span>
-                <input type="number" min={1} value={pricePoints} onChange={(event) => setPricePoints(Number(event.target.value || 0))} />
+                <input type="number" min={priceMinPoints} max={priceMaxPoints} value={pricePoints} onChange={(event) => setPricePoints(Number(event.target.value || 0))} />
+                <small>
+                  {priceMaxPoints ? `允许范围 ${priceMinPoints} - ${priceMaxPoints} 点` : `最低 ${priceMinPoints} 点`}
+                  {commissionRatePercent !== undefined ? ` · 平台抽佣 ${commissionRatePercent}%` : ""}
+                </small>
               </label>
               <label>
                 <span>试运行次数</span>
-                <input type="number" min={0} max={20} value={trialLimitPerUser} onChange={(event) => setTrialLimitPerUser(Number(event.target.value || 0))} />
+                <input type="number" min={0} max={trialLimitMaxPerUser} value={trialLimitPerUser} onChange={(event) => setTrialLimitPerUser(Number(event.target.value || 0))} />
+                <small>Admin 当前允许每人最多试运行 {trialLimitMaxPerUser} 次。</small>
               </label>
               <label className="check-field">
                 <input type="checkbox" checked={trialEnabled} onChange={(event) => setTrialEnabled(event.target.checked)} />
