@@ -21,6 +21,17 @@ function styleIncludes(pattern, message) {
   assert.ok(styles.includes(pattern), message);
 }
 
+function styleExcludes(pattern, message) {
+  assert.ok(!styles.includes(pattern), message);
+}
+
+function styleSection(startMarker, endMarker) {
+  const start = styles.indexOf(startMarker);
+  assert.ok(start >= 0, `Dashboard styles must include section: ${startMarker}.`);
+  const end = endMarker ? styles.indexOf(endMarker, start + startMarker.length) : -1;
+  return styles.slice(start, end >= 0 ? end : undefined);
+}
+
 for (const pattern of [
   "fallbackTools",
   "fallbackCases",
@@ -409,6 +420,24 @@ for (const pattern of [
   styleIncludes(pattern, `Dashboard workflow case marketplace styles must include ${pattern}.`);
 }
 
+const mobileStyles = styleSection("@media (max-width: 720px)", "@media (prefers-reduced-motion: reduce)");
+for (const pattern of [
+  ".model-table",
+  "overflow-x: visible",
+  ".model-row",
+  "min-width: 0",
+  "grid-template-columns: 1fr",
+  ".model-row.header",
+  "display: none",
+  "overflow-wrap: anywhere",
+  ".model-row .row-action",
+  "width: 100%"
+]) {
+  assert.ok(mobileStyles.includes(pattern), `Dashboard mobile model rows must keep responsive card layout: ${pattern}.`);
+}
+assert.ok(!mobileStyles.includes("min-width: 620px"), "Dashboard mobile model rows must not regress to fixed-width horizontal table.");
+styleExcludes("@media (max-width: 720px) {\n  .model-table {\n    overflow-x: auto;", "Dashboard mobile model table must not rely on horizontal scrolling.");
+
 console.log(JSON.stringify({
   checked: [
     "Dashboard contains no hardcoded demo tools/models/cases",
@@ -431,6 +460,7 @@ console.log(JSON.stringify({
     "Dashboard account settings reads /auth/me and credit balance, displays login methods, protocol entries and user-owned identity restrictions",
     "Dashboard shared work page consumes /works/share/:ticket, downloads with shareTicket and gates same-style generation by login",
     "Dashboard help center reads /customer-service and /faqs, then renders customer support entries and configurable FAQ",
-    "Dashboard agreement links read /agreements/:type and render published agreement markdown from Admin"
+    "Dashboard agreement links read /agreements/:type and render published agreement markdown from Admin",
+    "Dashboard mobile model rows collapse into card layout instead of fixed-width horizontal table"
   ]
 }, null, 2));
