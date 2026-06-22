@@ -175,6 +175,13 @@ for (const pattern of [
 ]) {
   includes(pattern, `Dashboard workflow case marketplace contract must include ${pattern}.`);
 }
+assert.ok(!source.includes("return fields.length ? fields : [{"), "Dashboard must not invent fallback workflow runForm fields when backend has not exposed them.");
+for (const pattern of [
+  "作者未开放可调整运行参数",
+  "发布版本中锁定的默认配置"
+]) {
+  includes(pattern, `Dashboard empty workflow runForm notice must include ${pattern}.`);
+}
 
 for (const pattern of [
   'apiGet<CreditBalance>("/credits/balance"',

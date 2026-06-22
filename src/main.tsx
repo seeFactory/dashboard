@@ -850,6 +850,13 @@ function WorkflowRunFormFields({
   onToast?: (toast: Toast) => void;
 }) {
   const fields = workflowRunFields(runForm);
+  if (!fields.length) {
+    return (
+      <div className="case-run-form">
+        <p className="muted-text">作者未开放可调整运行参数，将使用发布版本中锁定的默认配置。</p>
+      </div>
+    );
+  }
   const uploadFiles = async (field: WorkflowRunField, fileList: FileList | null) => {
     const files = Array.from(fileList || []).slice(0, workflowUploadMaxCount(field));
     if (!files.length) return;
@@ -1184,16 +1191,9 @@ function openExternalUrl(url?: string) {
 }
 
 function workflowRunFields(runForm?: WorkflowRunForm): WorkflowRunField[] {
-  const fields = Array.isArray(runForm?.fields)
+  return Array.isArray(runForm?.fields)
     ? runForm.fields.filter((field) => field && typeof field.key === "string" && field.key.trim())
     : [];
-  return fields.length ? fields : [{
-    key: "prompt",
-    label: "提示词",
-    type: "textarea",
-    required: true,
-    placeholder: "填写运行这个 Workflow 的提示词。"
-  }];
 }
 
 function fieldOptionValue(option: string | { label?: string; value?: string | number | boolean }) {
