@@ -2305,6 +2305,8 @@ function DashboardShell({
   components,
   customerService,
   faqs,
+  active,
+  onNavigate,
   onLogout,
   onToast
 }: {
@@ -2315,10 +2317,11 @@ function DashboardShell({
   components: ComponentDefinition[];
   customerService?: CustomerServiceConfig | null;
   faqs?: FaqItem[];
+  active: string;
+  onNavigate: (tab: string) => void;
   onLogout: () => void;
   onToast: (toast: Toast) => void;
 }) {
-  const [active, setActive] = useState("overview");
   const nav = [
     ["overview", "工作台", "panel"],
     ["create", "创作工具", "image"],
@@ -2341,7 +2344,7 @@ function DashboardShell({
         <Logo appConfig={appConfig} />
         <div className="side-nav">
           {nav.map(([key, label, icon]) => (
-            <button key={key} className={active === key ? "active" : ""} onClick={() => setActive(key)}>
+            <button key={key} className={active === key ? "active" : ""} onClick={() => onNavigate(key)}>
               <Icon name={icon} />
               {label}
             </button>
@@ -5168,6 +5171,58 @@ function currentShareTicket() {
   return match?.[1] ? decodeURIComponent(match[1]) : "";
 }
 
+const dashboardTabRoutes: Record<string, string> = {
+  overview: "/dashboard",
+  create: "/dashboard/create",
+  works: "/dashboard/works",
+  showcase: "/dashboard/showcase",
+  workflow: "/dashboard/workflow",
+  cases: "/dashboard/workflow-cases",
+  purchases: "/dashboard/workflow-purchases",
+  income: "/dashboard/workflow-income",
+  runs: "/dashboard/workflow-runs",
+  wallet: "/dashboard/wallet",
+  help: "/dashboard/help",
+  account: "/dashboard/account"
+};
+
+const dashboardRouteTabs: Record<string, string> = Object.entries(dashboardTabRoutes).reduce<Record<string, string>>(
+  (routes, [tab, route]) => {
+    routes[route] = tab;
+    return routes;
+  },
+  {
+    "/dashboard/purchases": "purchases",
+    "/dashboard/cases": "cases",
+    "/dashboard/runs": "runs",
+    "/dashboard/income": "income",
+    "/dashboard/workflows": "workflow",
+    "/dashboard/workflow": "workflow"
+  }
+);
+
+function normalizedPathname(pathname = window.location.pathname) {
+  const normalized = pathname.replace(/\/+$/, "");
+  return normalized || "/";
+}
+
+function dashboardTabFromPath(pathname = window.location.pathname) {
+  return dashboardRouteTabs[normalizedPathname(pathname)] || "";
+}
+
+function dashboardPathForTab(tab: string) {
+  return dashboardTabRoutes[tab] || dashboardTabRoutes.overview;
+}
+
+function replaceBrowserPath(path: string) {
+  window.history.replaceState({}, "", `${path}${window.location.search}${window.location.hash}`);
+}
+
+function pushBrowserPath(path: string) {
+  if (normalizedPathname() === normalizedPathname(path)) return;
+  window.history.pushState({}, "", path);
+}
+
 function ShareWorkPage({
   ticket,
   authed,
@@ -5318,8 +5373,16 @@ function App() {
   const data = usePublicData();
   const shareTicket = currentShareTicket();
   const [authed, setAuthed] = useState(() => Boolean(localStorage.getItem(tokenKey)));
-  const [view, setView] = useState<"public" | "dashboard">("public");
-  const [authOpen, setAuthOpen] = useState(false);
+  const [dashboardTab, setDashboardTab] = useState(() => dashboardTabFromPath() || "overview");
+  const [pendingDashboardTab, setPendingDashboardTab] = useState(() => dashboardTabFromPath());
+  const [view, setView] = useState<"public" | "dashboard">(() => {
+    const initialTab = dashboardTabFromPath();
+    return initialTab && !shareTicket && Boolean(localStorage.getItem(tokenKey)) ? "dashboard" : "public";
+  });
+  const [authOpen, setAuthOpen] = useState(() => {
+    const initialTab = dashboardTabFromPath();
+    return Boolean(initialTab && !shareTicket && !localStorage.getItem(tokenKey));
+  });
   const [toast, setToast] = useState<Toast | null>(null);
 
   const toastApi = (next: Toast) => {
@@ -5327,11 +5390,40 @@ function App() {
     window.setTimeout(() => setToast(null), 2400);
   };
 
+  const openDashboard = (tab = dashboardTab, mode: "push" | "replace" = "push") => {
+    const nextTab = tab || "overview";
+    setPendingDashboardTab("");
+    setDashboardTab(nextTab);
+    setView("dashboard");
+    const path = dashboardPathForTab(nextTab);
+    if (mode === "replace") {
+      replaceBrowserPath(path);
+    } else {
+      pushBrowserPath(path);
+    }
+  };
+
+  const requestDashboard = (tab = dashboardTab) => {
+    const nextTab = tab || "overview";
+    setDashboardTab(nextTab);
+    if (!authed) {
+      setPendingDashboardTab(nextTab);
+      pushBrowserPath(dashboardPathForTab(nextTab));
+      setAuthOpen(true);
+      return;
+    }
+    openDashboard(nextTab);
+  };
+
   const completeAuth = (result: AuthResult, provider: string) => {
+    const targetTab = pendingDashboardTab || dashboardTabFromPath() || dashboardTab || "overview";
     saveAuthResult(result);
     setAuthed(true);
     setAuthOpen(false);
+    setPendingDashboardTab("");
+    setDashboardTab(targetTab);
     setView("dashboard");
+    replaceBrowserPath(dashboardPathForTab(targetTab));
     toastApi({ title: authSuccessText(provider, result), tone: "success" });
   };
 
@@ -5360,19 +5452,45 @@ function App() {
       .catch((error) => toastApi({ title: error.message || "X 登录失败", tone: "danger" }));
   }, []);
 
+  useEffect(() => {
+    const syncRoute = () => {
+      const routeTab = dashboardTabFromPath();
+      const routeShareTicket = currentShareTicket();
+      if (routeShareTicket) {
+        setView("public");
+        setPendingDashboardTab("");
+        return;
+      }
+      if (!routeTab) {
+        setView("public");
+        setPendingDashboardTab("");
+        return;
+      }
+      setDashboardTab(routeTab);
+      if (localStorage.getItem(tokenKey)) {
+        setView("dashboard");
+        setAuthOpen(false);
+      } else {
+        setView("public");
+        setPendingDashboardTab(routeTab);
+        setAuthOpen(true);
+      }
+    };
+    window.addEventListener("popstate", syncRoute);
+    return () => window.removeEventListener("popstate", syncRoute);
+  }, []);
+
   const logout = () => {
     clearAuthResult();
     setAuthed(false);
+    setPendingDashboardTab("");
     setView("public");
+    replaceBrowserPath("/");
     toastApi({ title: "已退出工作台", tone: "info" });
   };
 
   const start = () => {
-    if (!authed) {
-      setAuthOpen(true);
-      return;
-    }
-    setView("dashboard");
+    requestDashboard("create");
   };
 
   return (
@@ -5386,17 +5504,19 @@ function App() {
           components={data.components}
           customerService={data.customerService}
           faqs={data.faqs}
+          active={dashboardTab}
+          onNavigate={(tab) => openDashboard(tab)}
           onLogout={logout}
           onToast={toastApi}
         />
       ) : (
-        <PublicShell appConfig={data.appConfig} authed={authed} onLogin={() => setAuthOpen(true)} onOpenDashboard={() => setView("dashboard")}>
+        <PublicShell appConfig={data.appConfig} authed={authed} onLogin={() => setAuthOpen(true)} onOpenDashboard={() => requestDashboard("overview")}>
           {shareTicket ? (
             <ShareWorkPage
               ticket={shareTicket}
               authed={authed}
               onLogin={() => setAuthOpen(true)}
-              onOpenDashboard={() => setView("dashboard")}
+              onOpenDashboard={() => requestDashboard("create")}
               onToast={toastApi}
             />
           ) : (

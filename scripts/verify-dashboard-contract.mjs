@@ -155,6 +155,25 @@ for (const pattern of [
 }
 
 for (const pattern of [
+  "const dashboardTabRoutes",
+  'overview: "/dashboard"',
+  'create: "/dashboard/create"',
+  'purchases: "/dashboard/workflow-purchases"',
+  'income: "/dashboard/workflow-income"',
+  'runs: "/dashboard/workflow-runs"',
+  "function dashboardTabFromPath",
+  "function dashboardPathForTab",
+  "pushBrowserPath(dashboardPathForTab(nextTab))",
+  "replaceBrowserPath(dashboardPathForTab(targetTab))",
+  "window.addEventListener(\"popstate\", syncRoute)",
+  "setPendingDashboardTab(routeTab)",
+  "onNavigate={(tab) => openDashboard(tab)}",
+  "requestDashboard(\"create\")"
+]) {
+  includes(pattern, `Dashboard protected workspace routing contract must include ${pattern}.`);
+}
+
+for (const pattern of [
   "function buildWorkflowGraph",
   "function buildWorkflowRunForm",
   "type WorkflowPublishPolicy",
@@ -499,6 +518,7 @@ console.log(JSON.stringify({
     "Dashboard renders empty/error states instead of business-data fallbacks",
     "Dashboard H5 Google/X/Telegram login paths are wired",
     "Dashboard H5 login has no local preview-login bypass",
+    "Dashboard protected workspace tabs are URL-routable and login-gated",
     "Dashboard workflow draft save and case publish paths are wired",
     "Dashboard workflow publishing consumes backend AppConfig workflowPolicy for price, trial and node limits",
     "Dashboard workflow editor supports draggable node ordering and node config panel",
