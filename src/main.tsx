@@ -523,6 +523,12 @@ type Toast = {
   tone?: "success" | "danger" | "info";
 };
 
+type PendingPublicAction = {
+  type: "gallery-download" | "gallery-rerun" | "share-download" | "share-rerun";
+  workId?: string;
+  ticket?: string;
+};
+
 type AuthResult = {
   accessToken: string;
   refreshToken: string;
@@ -635,6 +641,7 @@ const TELEGRAM_BOT_USERNAME = String(
 
 const tokenKey = "seefactory.dashboard.accessToken";
 const refreshTokenKey = "seefactory.dashboard.refreshToken";
+const pendingPublicActionKey = "seefactory.dashboard.pendingPublicAction";
 const xCodeVerifierKey = "seefactory.dashboard.xCodeVerifier";
 const xRedirectUriKey = "seefactory.dashboard.xRedirectUri";
 
@@ -1307,6 +1314,31 @@ function clearAuthResult() {
   localStorage.removeItem(refreshTokenKey);
 }
 
+function isPendingPublicAction(value: unknown): value is PendingPublicAction {
+  if (!value || typeof value !== "object") return false;
+  const action = value as PendingPublicAction;
+  return ["gallery-download", "gallery-rerun", "share-download", "share-rerun"].includes(action.type);
+}
+
+function readPendingPublicAction(): PendingPublicAction | null {
+  try {
+    const raw = sessionStorage.getItem(pendingPublicActionKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return isPendingPublicAction(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePendingPublicAction(action: PendingPublicAction) {
+  sessionStorage.setItem(pendingPublicActionKey, JSON.stringify(action));
+}
+
+function clearPendingPublicAction() {
+  sessionStorage.removeItem(pendingPublicActionKey);
+}
+
 function randomBase64Url(byteLength = 48) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
   if (window.crypto?.getRandomValues) {
@@ -1762,6 +1794,9 @@ function GalleryPanel({
   authed,
   onLogin,
   onToast,
+  pendingAction,
+  onRequireAuthAction,
+  onActionConsumed,
   compact = false
 }: {
   tools: Tool[];
@@ -1769,6 +1804,9 @@ function GalleryPanel({
   authed: boolean;
   onLogin: () => void;
   onToast: (toast: Toast) => void;
+  pendingAction?: PendingPublicAction | null;
+  onRequireAuthAction?: (action: PendingPublicAction) => void;
+  onActionConsumed?: () => void;
   compact?: boolean;
 }) {
   const [items, setItems] = useState<Work[]>(initialWorks);
@@ -1822,7 +1860,11 @@ function GalleryPanel({
   const downloadGalleryWork = (work: Work | null) => {
     if (!work?.id) return;
     if (!authed) {
-      onLogin();
+      if (onRequireAuthAction) {
+        onRequireAuthAction({ type: "gallery-download", workId: work.id });
+      } else {
+        onLogin();
+      }
       onToast({ title: "请先登录后再下载作品", tone: "info" });
       return;
     }
@@ -1857,7 +1899,11 @@ function GalleryPanel({
   const rerunGalleryWork = (work: Work | null) => {
     if (!work?.id) return;
     if (!authed) {
-      onLogin();
+      if (onRequireAuthAction) {
+        onRequireAuthAction({ type: "gallery-rerun", workId: work.id });
+      } else {
+        onLogin();
+      }
       onToast({ title: "请先登录后再同款创作", tone: "info" });
       return;
     }
@@ -1879,6 +1925,21 @@ function GalleryPanel({
       .catch((err) => onToast({ title: err.message || "同款生成失败", tone: "danger" }))
       .finally(() => setBusy(""));
   };
+
+  useEffect(() => {
+    if (!authed || !pendingAction?.workId) return;
+    if (pendingAction.type !== "gallery-download" && pendingAction.type !== "gallery-rerun") return;
+    const target = selectedWork?.id === pendingAction.workId
+      ? selectedWork
+      : items.find((item) => item.id === pendingAction.workId);
+    if (!target) return;
+    onActionConsumed?.();
+    if (pendingAction.type === "gallery-download") {
+      downloadGalleryWork(target);
+    } else {
+      rerunGalleryWork(target);
+    }
+  }, [authed, pendingAction, selectedWork, items]);
 
   return (
     <section id="showcase" className={compact ? "content-band public-gallery compact" : "workspace-section public-gallery"}>
@@ -2279,13 +2340,19 @@ function PublicHome({
   authed,
   onStart,
   onLogin,
-  onToast
+  onToast,
+  pendingAction,
+  onRequireAuthAction,
+  onActionConsumed
 }: {
   data: ReturnType<typeof usePublicData>;
   authed: boolean;
   onStart: () => void;
   onLogin: () => void;
   onToast: (toast: Toast) => void;
+  pendingAction?: PendingPublicAction | null;
+  onRequireAuthAction?: (action: PendingPublicAction) => void;
+  onActionConsumed?: () => void;
 }) {
   const scrollToShowcase = () => document.getElementById("showcase")?.scrollIntoView({ behavior: "smooth", block: "start" });
   return (
@@ -2295,7 +2362,17 @@ function PublicHome({
       {data.error ? <EmptyBlock title="部分公开配置加载失败" body={data.error} /> : null}
       <ToolMatrix tools={data.tools} />
       <CaseSquare cases={data.cases} />
-      <GalleryPanel tools={data.tools} initialWorks={data.galleryWorks} authed={authed} onLogin={onLogin} onToast={onToast} compact />
+      <GalleryPanel
+        tools={data.tools}
+        initialWorks={data.galleryWorks}
+        authed={authed}
+        onLogin={onLogin}
+        onToast={onToast}
+        pendingAction={pendingAction}
+        onRequireAuthAction={onRequireAuthAction}
+        onActionConsumed={onActionConsumed}
+        compact
+      />
       <ModelTable models={data.models} />
       <PricingHelp customerService={data.customerService} faqs={data.faqs} rechargePolicy={data.rechargePolicy} onToast={onToast} />
     </>
@@ -5233,13 +5310,19 @@ function ShareWorkPage({
   authed,
   onLogin,
   onOpenDashboard,
-  onToast
+  onToast,
+  pendingAction,
+  onRequireAuthAction,
+  onActionConsumed
 }: {
   ticket: string;
   authed: boolean;
   onLogin: () => void;
   onOpenDashboard: () => void;
   onToast: (toast: Toast) => void;
+  pendingAction?: PendingPublicAction | null;
+  onRequireAuthAction?: (action: PendingPublicAction) => void;
+  onActionConsumed?: () => void;
 }) {
   const [work, setWork] = useState<Work | null>(null);
   const [loading, setLoading] = useState(true);
@@ -5262,7 +5345,11 @@ function ShareWorkPage({
   const downloadSharedWork = () => {
     if (!work?.id) return;
     if (!authed) {
-      onLogin();
+      if (onRequireAuthAction) {
+        onRequireAuthAction({ type: "share-download", workId: work.id, ticket });
+      } else {
+        onLogin();
+      }
       onToast({ title: "请先登录后再下载作品", tone: "info" });
       return;
     }
@@ -5297,7 +5384,11 @@ function ShareWorkPage({
   const rerunSharedWork = () => {
     if (!work?.id) return;
     if (!authed) {
-      onLogin();
+      if (onRequireAuthAction) {
+        onRequireAuthAction({ type: "share-rerun", workId: work.id, ticket });
+      } else {
+        onLogin();
+      }
       onToast({ title: "请先登录后再同款创作", tone: "info" });
       return;
     }
@@ -5320,6 +5411,17 @@ function ShareWorkPage({
       .catch((err) => onToast({ title: err.message || "同款生成失败", tone: "danger" }))
       .finally(() => setBusy(""));
   };
+
+  useEffect(() => {
+    if (!authed || !work?.id || pendingAction?.ticket !== ticket) return;
+    if (pendingAction.type !== "share-download" && pendingAction.type !== "share-rerun") return;
+    onActionConsumed?.();
+    if (pendingAction.type === "share-download") {
+      downloadSharedWork();
+    } else {
+      rerunSharedWork();
+    }
+  }, [authed, work?.id, pendingAction, ticket]);
 
   if (loading) return <LoadingBlock title="正在打开分享作品" />;
 
@@ -5393,6 +5495,7 @@ function App() {
     const initialTab = dashboardTabFromPath();
     return Boolean(initialTab && !shareTicket && !localStorage.getItem(tokenKey));
   });
+  const [pendingPublicAction, setPendingPublicAction] = useState<PendingPublicAction | null>(() => readPendingPublicAction());
   const [toast, setToast] = useState<Toast | null>(null);
 
   const toastApi = (next: Toast) => {
@@ -5425,12 +5528,35 @@ function App() {
     openDashboard(nextTab);
   };
 
+  const rememberPublicAction = (action: PendingPublicAction) => {
+    savePendingPublicAction(action);
+    setPendingPublicAction(action);
+    setAuthOpen(true);
+  };
+
+  const consumePendingPublicAction = () => {
+    clearPendingPublicAction();
+    setPendingPublicAction(null);
+  };
+
   const completeAuth = (result: AuthResult, provider: string) => {
     const targetTab = pendingDashboardTab || dashboardTabFromPath() || dashboardTab || "overview";
     saveAuthResult(result);
     setAuthed(true);
     setAuthOpen(false);
     setPendingDashboardTab("");
+    const publicAction = pendingPublicAction || readPendingPublicAction();
+    if (publicAction) {
+      setPendingPublicAction(publicAction);
+      setView("public");
+      if ((publicAction.type === "share-download" || publicAction.type === "share-rerun") && publicAction.ticket) {
+        replaceBrowserPath(`/share/${encodeURIComponent(publicAction.ticket || "")}`);
+      } else {
+        replaceBrowserPath("/");
+      }
+      toastApi({ title: authSuccessText(provider, result), tone: "success" });
+      return;
+    }
     setDashboardTab(targetTab);
     setView("dashboard");
     replaceBrowserPath(dashboardPathForTab(targetTab));
@@ -5492,8 +5618,10 @@ function App() {
 
   const logout = () => {
     clearAuthResult();
+    clearPendingPublicAction();
     setAuthed(false);
     setPendingDashboardTab("");
+    setPendingPublicAction(null);
     setView("public");
     replaceBrowserPath("/");
     toastApi({ title: "已退出工作台", tone: "info" });
@@ -5528,6 +5656,9 @@ function App() {
               onLogin={() => setAuthOpen(true)}
               onOpenDashboard={() => requestDashboard("create")}
               onToast={toastApi}
+              pendingAction={pendingPublicAction}
+              onRequireAuthAction={rememberPublicAction}
+              onActionConsumed={consumePendingPublicAction}
             />
           ) : (
             <PublicHome
@@ -5536,6 +5667,9 @@ function App() {
               onStart={start}
               onLogin={() => setAuthOpen(true)}
               onToast={toastApi}
+              pendingAction={pendingPublicAction}
+              onRequireAuthAction={rememberPublicAction}
+              onActionConsumed={consumePendingPublicAction}
             />
           )}
         </PublicShell>

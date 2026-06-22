@@ -510,6 +510,30 @@ for (const pattern of [
 assert.ok(!mobileStyles.includes("min-width: 620px"), "Dashboard mobile model rows must not regress to fixed-width horizontal table.");
 styleExcludes("@media (max-width: 720px) {\n  .model-table {\n    overflow-x: auto;", "Dashboard mobile model table must not rely on horizontal scrolling.");
 
+for (const pattern of [
+  "type PendingPublicAction",
+  'const pendingPublicActionKey = "seefactory.dashboard.pendingPublicAction"',
+  "function readPendingPublicAction()",
+  "function savePendingPublicAction(action: PendingPublicAction)",
+  "function clearPendingPublicAction()",
+  "const [pendingPublicAction, setPendingPublicAction]",
+  "const rememberPublicAction = (action: PendingPublicAction)",
+  "const consumePendingPublicAction = () =>",
+  "const publicAction = pendingPublicAction || readPendingPublicAction()",
+  'onRequireAuthAction({ type: "gallery-download", workId: work.id })',
+  'onRequireAuthAction({ type: "gallery-rerun", workId: work.id })',
+  'pendingAction.type !== "gallery-download" && pendingAction.type !== "gallery-rerun"',
+  'onRequireAuthAction({ type: "share-download", workId: work.id, ticket })',
+  'onRequireAuthAction({ type: "share-rerun", workId: work.id, ticket })',
+  'pendingAction.type !== "share-download" && pendingAction.type !== "share-rerun"',
+  'replaceBrowserPath(`/share/${encodeURIComponent(publicAction.ticket || "")}`)',
+  "pendingAction={pendingPublicAction}",
+  "onRequireAuthAction={rememberPublicAction}",
+  "onActionConsumed={consumePendingPublicAction}"
+]) {
+  includes(pattern, `Dashboard pending public action contract must include ${pattern}.`);
+}
+
 console.log(JSON.stringify({
   checked: [
     "Dashboard directory is the real git worktree for seeFactory/dashboard.git",
@@ -533,6 +557,7 @@ console.log(JSON.stringify({
     "Dashboard tool creation panel creates generation tasks, polls task state, previews works, downloads and publishes works",
     "Dashboard works library lists, filters, previews, downloads, shares, reruns, deletes and publishes works",
     "Dashboard public gallery reads /gallery/works, shows public details, copies prompts and gates download/same-style generation by login",
+    "Dashboard restores protected public gallery/share actions after login",
     "Dashboard account settings reads /auth/me and credit balance, displays login methods, protocol entries and user-owned identity restrictions",
     "Dashboard shared work page consumes /works/share/:ticket and gates download/same-style generation by login",
     "Dashboard help center reads /customer-service and /faqs, then renders customer support entries and configurable FAQ",
