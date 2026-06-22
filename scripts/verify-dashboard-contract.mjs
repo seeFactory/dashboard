@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const source = readFileSync(resolve("src/main.tsx"), "utf8");
 const styles = readFileSync(resolve("src/styles.css"), "utf8");
+
+for (const asset of ["public/home-bg.mp4", "public/home-bg-poster.jpg"]) {
+  assert.ok(existsSync(resolve(asset)), `Dashboard default home media asset must exist: ${asset}.`);
+}
 
 function includes(pattern, message) {
   assert.ok(source.includes(pattern), message);
