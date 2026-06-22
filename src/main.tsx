@@ -118,9 +118,12 @@ type CaseContent = {
   trialLimitPerUser?: number;
   trialRemaining?: number;
   purchased?: boolean;
+  canRun?: boolean;
   runnable?: boolean;
+  runBlockedReason?: string;
   disabled?: boolean;
   disabledReason?: string;
+  hasReplacementModel?: boolean;
   purchaseRequired?: boolean;
   allowClone?: boolean;
   allowExport?: boolean;
@@ -132,10 +135,15 @@ type CaseContent = {
 
 type WorkflowPurchaseStatus = {
   purchased: boolean;
+  purchaseId?: string;
+  canRun?: boolean;
   runnable: boolean;
+  runBlockedReason?: string;
   disabled?: boolean;
   disabledReason?: string;
+  hasReplacementModel?: boolean;
   replacementAvailable?: boolean;
+  visibility?: string;
   trialEnabled?: boolean;
   trialLimitPerUser?: number;
   trialUsed?: number;
@@ -230,8 +238,13 @@ type WorkflowPurchase = {
   caseContentId: string;
   pricePoints?: number;
   status?: string;
+  canRun?: boolean;
   runnable?: boolean;
+  runBlockedReason?: string;
+  disabled?: boolean;
   disabledReason?: string;
+  hasReplacementModel?: boolean;
+  replacementAvailable?: boolean;
   purchasedAt?: string;
   case?: CaseContent;
   version?: {
@@ -970,6 +983,17 @@ function formatPoints(value?: number) {
   const normalized = Number(value ?? 0);
   if (!Number.isFinite(normalized)) return "0";
   return new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 }).format(normalized);
+}
+
+function workflowCanRun(item?: { canRun?: boolean; runnable?: boolean; status?: string; disabled?: boolean } | null) {
+  if (!item) return false;
+  if (item.canRun !== undefined) return Boolean(item.canRun);
+  if (item.runnable !== undefined) return Boolean(item.runnable);
+  return item.status !== "disabled" && item.disabled !== true;
+}
+
+function workflowBlockedReason(item?: { runBlockedReason?: string; disabledReason?: string } | null) {
+  return item?.runBlockedReason || item?.disabledReason || "";
 }
 
 function formatCnyFromCents(value?: number) {
@@ -4160,9 +4184,7 @@ function WorkflowCasePanel({ initialCases, onToast }: { initialCases: CaseConten
       .finally(() => setBusy(""));
   };
 
-  const canRun = selectedCase?.licenseMode === "closed_paid"
-    ? Boolean(status?.purchased && status?.runnable)
-    : Boolean(status ? status.runnable : selectedCase);
+  const canRun = workflowCanRun(status || selectedCase);
   const canTrial = selectedCase?.licenseMode === "closed_paid" && Boolean(status?.trialEnabled) && Number(status?.trialRemaining || 0) > 0 && !status?.purchased;
   const uploadBusy = isWorkflowUploadBusy(runUploadState);
 
@@ -4214,7 +4236,7 @@ function WorkflowCasePanel({ initialCases, onToast }: { initialCases: CaseConten
               <span>克隆 {selectedCase.cloneCount || 0}</span>
             </div>
             {detailLoading ? <LoadingBlock title="正在同步案例权益" /> : null}
-            {status?.disabled ? <p className="danger-text">{status.disabledReason || "该 Workflow 当前不可运行。"}</p> : null}
+            {!canRun && status ? <p className="danger-text">{workflowBlockedReason(status) || "该 Workflow 当前不可运行。"}</p> : null}
             <WorkflowRunFormFields
               runForm={selectedCase.runForm}
               values={runValues}
@@ -4302,8 +4324,8 @@ function PurchasedTemplates({ onToast }: { onToast: (toast: Toast) => void }) {
   }, []);
 
   const runTemplate = (item: WorkflowPurchase) => {
-    if (item.runnable === false || item.status === "disabled") {
-      onToast({ title: item.disabledReason || "该模板已暂停运行", tone: "danger" });
+    if (!workflowCanRun(item)) {
+      onToast({ title: workflowBlockedReason(item) || "该模板已暂停运行", tone: "danger" });
       return;
     }
     const runForm = item.case?.runForm || item.version?.runForm;
@@ -4358,11 +4380,11 @@ function PurchasedTemplates({ onToast }: { onToast: (toast: Toast) => void }) {
         return (
           <article className="tool-card" key={item.id}>
             <div className="card-topline">
-              <Icon name={item.runnable === false ? "alert" : "badge"} />
-              <span>{item.status === "disabled" || item.runnable === false ? "暂停运行" : "可运行"}</span>
+              <Icon name={workflowCanRun(item) ? "badge" : "alert"} />
+              <span>{workflowCanRun(item) ? "可运行" : "暂停运行"}</span>
             </div>
             <h3>{item.case?.title || item.version?.title || "Workflow 模板"}</h3>
-            <p>{item.case?.summary || item.version?.summary || item.disabledReason || "已购买的闭源模板，可继续调度运行。"}</p>
+            <p>{item.case?.summary || item.version?.summary || workflowBlockedReason(item) || "已购买的闭源模板，可继续调度运行。"}</p>
             <div className="mini-meta">
               <span>{item.pricePoints || 0} 点</span>
               <span>{item.purchasedAt ? formatDate(item.purchasedAt) : "永久权益"}</span>
@@ -4370,7 +4392,7 @@ function PurchasedTemplates({ onToast }: { onToast: (toast: Toast) => void }) {
             <WorkflowRunFormFields
               runForm={runForm}
               values={values}
-              disabled={runningId === item.id || item.runnable === false}
+              disabled={runningId === item.id || !workflowCanRun(item)}
               uploadState={uploadState}
               onChange={(key, value) => setRunValuesById((current) => ({
                 ...current,
@@ -4388,7 +4410,7 @@ function PurchasedTemplates({ onToast }: { onToast: (toast: Toast) => void }) {
               }))}
               onToast={onToast}
             />
-            <Button variant="ghost" disabled={runningId === item.id || uploadBusy || item.runnable === false} onClick={() => runTemplate(item)}>
+            <Button variant="ghost" disabled={runningId === item.id || uploadBusy || !workflowCanRun(item)} onClick={() => runTemplate(item)}>
               <Icon name="play" />
               {runningId === item.id ? "提交中" : "运行模板"}
             </Button>
