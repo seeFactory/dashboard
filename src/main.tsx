@@ -614,7 +614,7 @@ declare global {
 const API_BASE = (
   import.meta.env.VITE_SEEFACTORY_API_BASE ||
   import.meta.env.VITE_API_BASE ||
-  "http://127.0.0.1:10087/api/v1"
+  (import.meta.env.DEV ? "http://127.0.0.1:10087/api/v1" : "https://api.seefactory.xyz/api/v1")
 ).replace(/\/+$/, "");
 
 const GOOGLE_CLIENT_ID = String(
@@ -1373,13 +1373,11 @@ function authSuccessText(provider: string, result: AuthResult) {
 function AuthModal({
   open,
   onClose,
-  onPreviewLogin,
   onAuthSuccess,
   onToast
 }: {
   open: boolean;
   onClose: () => void;
-  onPreviewLogin: () => void;
   onAuthSuccess: (result: AuthResult, provider: string) => void;
   onToast: (toast: Toast) => void;
 }) {
@@ -1520,12 +1518,6 @@ function AuthModal({
           </div>
         </div>
         {pendingProvider ? <p className="muted-text">正在完成 {pendingProvider} 登录，请稍候。</p> : null}
-        {import.meta.env.DEV ? (
-          <Button variant="ghost" onClick={onPreviewLogin}>
-            <Icon name="login" />
-            本地预览登录
-          </Button>
-        ) : null}
         <p className="muted-text">
           Telegram Web 登录会走后端 <code>/auth/h5/telegram-login</code> 验签，并和 TMA 身份统一绑定。
         </p>
@@ -5368,14 +5360,6 @@ function App() {
       .catch((error) => toastApi({ title: error.message || "X 登录失败", tone: "danger" }));
   }, []);
 
-  const previewLogin = () => {
-    localStorage.setItem(tokenKey, "local-preview-token");
-    setAuthed(true);
-    setAuthOpen(false);
-    setView("dashboard");
-    toastApi({ title: "已进入本地预览登录态", tone: "success" });
-  };
-
   const logout = () => {
     clearAuthResult();
     setAuthed(false);
@@ -5429,7 +5413,6 @@ function App() {
       <AuthModal
         open={authOpen}
         onClose={() => setAuthOpen(false)}
-        onPreviewLogin={previewLogin}
         onAuthSuccess={completeAuth}
         onToast={toastApi}
       />

@@ -84,6 +84,15 @@ for (const pattern of [
 }
 
 for (const pattern of [
+  "onPreviewLogin",
+  "previewLogin",
+  "local-preview-token",
+  "本地预览登录"
+]) {
+  excludes(pattern, `Dashboard H5 login contract must not include preview-login bypass: ${pattern}.`);
+}
+
+for (const pattern of [
   "function buildWorkflowGraph",
   "function buildWorkflowRunForm",
   "type WorkflowPublishPolicy",
@@ -406,6 +415,7 @@ console.log(JSON.stringify({
     "Dashboard reads AppConfig, tools, cases, models, components and public recharge policy from backend APIs",
     "Dashboard renders empty/error states instead of business-data fallbacks",
     "Dashboard H5 Google/X/Telegram login paths are wired",
+    "Dashboard H5 login has no local preview-login bypass",
     "Dashboard workflow draft save and case publish paths are wired",
     "Dashboard workflow publishing consumes backend AppConfig workflowPolicy for price, trial and node limits",
     "Dashboard workflow editor supports draggable node ordering and node config panel",
