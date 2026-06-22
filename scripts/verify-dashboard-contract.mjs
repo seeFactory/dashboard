@@ -33,6 +33,8 @@ for (const pattern of [
 }
 
 for (const pattern of [
+  "type PublicAppConfig",
+  'apiGet<PublicAppConfig>("/app/config")',
   'apiGet<Tool[]>("/tools")',
   'apiGet<PageData<CaseContent>>("/case-contents?caseType=workflow&pageSize=8")',
   'apiGet<PageData<Work>>("/gallery/works?pageSize=12")',
@@ -41,6 +43,7 @@ for (const pattern of [
   'apiGet<CustomerServiceConfig>("/customer-service")',
   'apiGet<{ list: FaqItem[] }>("/faqs")',
   'apiGet<RechargePolicy>("/credits/recharge-settings")',
+  "setAppConfig(appConfigResult.ok ? appConfigResult.value : null)",
   "setTools(toolResult.ok ? toolResult.value : [])",
   "setCases(caseResult.ok ? caseResult.value.list || [] : [])",
   "setGalleryWorks(galleryResult.ok ? galleryResult.value.list || [] : [])",
@@ -49,6 +52,10 @@ for (const pattern of [
   "setCustomerService(customerResult.ok ? customerResult.value : null)",
   "setFaqs(faqResult.ok ? faqResult.value.list || [] : [])",
   "setRechargePolicy(rechargeResult.ok ? rechargeResult.value : null)",
+  "function resolveLogoUrl",
+  "function HeroBackground",
+  "appConfig?.brand?.name",
+  "home?.videoUrl",
   "暂无公开工具",
   "暂无公开 Workflow 案例",
   "暂无公开作品",
@@ -341,6 +348,9 @@ for (const pattern of [
   ".account-link-list",
   ".share-work-page",
   ".share-work-layout",
+  ".hero-media",
+  "--hero-overlay-opacity",
+  "--hero-card-opacity",
   ".support-panel",
   ".support-layout",
   ".support-card",
@@ -358,7 +368,7 @@ for (const pattern of [
 console.log(JSON.stringify({
   checked: [
     "Dashboard contains no hardcoded demo tools/models/cases",
-    "Dashboard reads tools, cases, models, components and public recharge policy from backend APIs",
+    "Dashboard reads AppConfig, tools, cases, models, components and public recharge policy from backend APIs",
     "Dashboard renders empty/error states instead of business-data fallbacks",
     "Dashboard H5 Google/X/Telegram login paths are wired",
     "Dashboard workflow draft save and case publish paths are wired",

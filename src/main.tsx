@@ -385,6 +385,33 @@ type RechargePolicy = {
   allowPayPerGeneration?: boolean;
 };
 
+type PublicAppConfig = {
+  brand?: {
+    name?: string;
+    subtitle?: string;
+    logoUrl?: string;
+    faviconUrl?: string;
+  };
+  home?: {
+    eyebrow?: string;
+    headline?: string;
+    subtitle?: string;
+    videoUrl?: string;
+    posterUrl?: string;
+    fallbackImageUrl?: string;
+    fallbackMode?: string;
+    videoFixed?: boolean;
+    videoMuted?: boolean;
+    videoLoop?: boolean;
+    overlayOpacity?: number;
+    mainCardOpacity?: number;
+  };
+  feature?: Record<string, unknown>;
+  customer?: Record<string, unknown>;
+  legal?: Record<string, unknown>;
+  generation?: Record<string, unknown>;
+};
+
 type CryptoTokenOption = {
   token: string;
   bridgeCurrency?: string;
@@ -632,7 +659,29 @@ function settle<T>(promise: Promise<T>): Promise<{ ok: true; value: T } | { ok: 
     }));
 }
 
+function resolveLogoUrl(value?: string) {
+  const url = String(value || "").trim();
+  if (!url || url === "docs/logo.png") return "/logo.png";
+  if (/^(https?:|data:|blob:)/i.test(url) || url.startsWith("/")) return url;
+  return `/${url.replace(/^\/+/, "")}`;
+}
+
+function resolveConfigAssetUrl(value?: string) {
+  const url = String(value || "").trim();
+  if (!url) return "";
+  if (url === "docs/logo.png") return "/logo.png";
+  if (/^(https?:|data:|blob:)/i.test(url) || url.startsWith("/")) return url;
+  return `/${url.replace(/^\/+/, "")}`;
+}
+
+function clampConfigNumber(value: unknown, min: number, max: number, fallback: number) {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+}
+
 function usePublicData() {
+  const [appConfig, setAppConfig] = useState<PublicAppConfig | null>(null);
   const [tools, setTools] = useState<Tool[]>([]);
   const [cases, setCases] = useState<CaseContent[]>([]);
   const [galleryWorks, setGalleryWorks] = useState<Work[]>([]);
@@ -647,6 +696,7 @@ function usePublicData() {
   useEffect(() => {
     let mounted = true;
     Promise.all([
+      settle(apiGet<PublicAppConfig>("/app/config")),
       settle(apiGet<Tool[]>("/tools")),
       settle(apiGet<PageData<CaseContent>>("/case-contents?caseType=workflow&pageSize=8")),
       settle(apiGet<PageData<Work>>("/gallery/works?pageSize=12")),
@@ -656,8 +706,9 @@ function usePublicData() {
       settle(apiGet<{ list: FaqItem[] }>("/faqs")),
       settle(apiGet<RechargePolicy>("/credits/recharge-settings"))
     ])
-      .then(([toolResult, caseResult, galleryResult, modelResult, componentResult, customerResult, faqResult, rechargeResult]) => {
+      .then(([appConfigResult, toolResult, caseResult, galleryResult, modelResult, componentResult, customerResult, faqResult, rechargeResult]) => {
         if (!mounted) return;
+        setAppConfig(appConfigResult.ok ? appConfigResult.value : null);
         setTools(toolResult.ok ? toolResult.value : []);
         setCases(caseResult.ok ? caseResult.value.list || [] : []);
         setGalleryWorks(galleryResult.ok ? galleryResult.value.list || [] : []);
@@ -667,6 +718,7 @@ function usePublicData() {
         setFaqs(faqResult.ok ? faqResult.value.list || [] : []);
         setRechargePolicy(rechargeResult.ok ? rechargeResult.value : null);
         const errors = [
+          appConfigResult.ok ? "" : `公开配置：${appConfigResult.reason?.message || "加载失败"}`,
           toolResult.ok ? "" : `工具配置：${toolResult.reason?.message || "加载失败"}`,
           caseResult.ok ? "" : `案例配置：${caseResult.reason?.message || "加载失败"}`,
           galleryResult.ok ? "" : `作品广场：${galleryResult.reason?.message || "加载失败"}`,
@@ -684,16 +736,19 @@ function usePublicData() {
     };
   }, []);
 
-  return { tools, cases, galleryWorks, models, components, customerService, faqs, rechargePolicy, loading, error };
+  return { appConfig, tools, cases, galleryWorks, models, components, customerService, faqs, rechargePolicy, loading, error };
 }
 
-function Logo() {
+function Logo({ appConfig }: { appConfig?: PublicAppConfig | null }) {
+  const brandName = appConfig?.brand?.name?.trim() || "seeFactory";
+  const subtitle = appConfig?.brand?.subtitle?.trim() || "AI 创作工厂";
+  const logoUrl = resolveLogoUrl(appConfig?.brand?.logoUrl);
   return (
     <div className="brand-lockup">
-      <img src="/logo.png" alt="seeFactory" />
+      <img src={logoUrl} alt={brandName} />
       <div>
-        <strong>seeFactory</strong>
-        <span>AI 创作工厂</span>
+        <strong>{brandName}</strong>
+        <span>{subtitle}</span>
       </div>
     </div>
   );
@@ -1411,11 +1466,13 @@ function AuthModal({
 }
 
 function PublicShell({
+  appConfig,
   authed,
   onLogin,
   onOpenDashboard,
   children
 }: {
+  appConfig?: PublicAppConfig | null;
   authed: boolean;
   onLogin: () => void;
   onOpenDashboard: () => void;
@@ -1424,7 +1481,7 @@ function PublicShell({
   return (
     <div className="site-shell">
       <header className="topbar">
-        <Logo />
+        <Logo appConfig={appConfig} />
         <nav>
           <a href="#tools">工具</a>
           <a href="#cases">案例</a>
@@ -1450,15 +1507,63 @@ function PublicShell({
   );
 }
 
-function Hero({ tools, onStart, onShowcase }: { tools: Tool[]; onStart: () => void; onShowcase: () => void }) {
+function HeroBackground({ home }: { home?: PublicAppConfig["home"] }) {
+  const videoUrl = resolveConfigAssetUrl(home?.videoUrl);
+  const posterUrl = resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl);
+  if (!videoUrl && !posterUrl) return null;
+
   return (
-    <section className="hero-section">
+    <div className={`hero-media ${home?.videoFixed === false ? "" : "fixed"}`} aria-hidden="true">
+      {videoUrl ? (
+        <video
+          src={videoUrl}
+          poster={posterUrl || undefined}
+          autoPlay
+          muted={home?.videoMuted !== false}
+          loop={home?.videoLoop !== false}
+          playsInline
+          preload="metadata"
+        />
+      ) : (
+        <img src={posterUrl} alt="" loading="eager" />
+      )}
+    </div>
+  );
+}
+
+function Hero({
+  appConfig,
+  tools,
+  onStart,
+  onShowcase
+}: {
+  appConfig?: PublicAppConfig | null;
+  tools: Tool[];
+  onStart: () => void;
+  onShowcase: () => void;
+}) {
+  const home = appConfig?.home;
+  const brandName = appConfig?.brand?.name?.trim() || "seeFactory";
+  const hasMedia = Boolean(home?.videoUrl || home?.posterUrl || home?.fallbackImageUrl);
+  const overlayOpacity = clampConfigNumber(home?.overlayOpacity, 0.24, 0.86, 0.58);
+  const mainCardOpacity = clampConfigNumber(home?.mainCardOpacity, 0.32, 0.9, 0.72);
+  const style = {
+    "--hero-overlay-opacity": String(overlayOpacity),
+    "--hero-card-opacity": String(mainCardOpacity)
+  } as React.CSSProperties;
+  const eyebrow = home?.eyebrow?.trim() || "PC Dashboard / public studio";
+  const headline = home?.headline?.trim() || "把模型、工具和 Workflow 放进同一个创作台";
+  const intro =
+    home?.subtitle?.trim() ||
+    `${brandName} Dashboard 面向桌面创作者：未登录可浏览公开工具、案例、提示词和模型能力；登录后进入作品库、钱包、已购模板库和 Workflow 控制台。`;
+
+  return (
+    <section className={`hero-section ${hasMedia ? "has-media" : ""}`} style={style}>
+      <HeroBackground home={home} />
       <div className="hero-copy">
-        <span className="eyebrow">PC Dashboard / public studio</span>
-        <h1>把模型、工具和 Workflow 放进同一个创作台</h1>
-        <p>
-          seeFactory Dashboard 面向桌面创作者：未登录可浏览公开工具、案例、提示词和模型能力；登录后进入作品库、钱包、已购模板库和 Workflow 控制台。
-        </p>
+        <span className="eyebrow">{eyebrow}</span>
+        <h1>{headline}</h1>
+        <p>{intro}</p>
         <div className="hero-actions">
           <Button onClick={onStart}>
             <Icon name="play" />
@@ -2119,7 +2224,7 @@ function PublicHome({
   const scrollToShowcase = () => document.getElementById("showcase")?.scrollIntoView({ behavior: "smooth", block: "start" });
   return (
     <>
-      <Hero tools={data.tools} onStart={onStart} onShowcase={scrollToShowcase} />
+      <Hero appConfig={data.appConfig} tools={data.tools} onStart={onStart} onShowcase={scrollToShowcase} />
       {data.loading ? <LoadingBlock title="正在同步公开配置" /> : null}
       {data.error ? <EmptyBlock title="部分公开配置加载失败" body={data.error} /> : null}
       <ToolMatrix tools={data.tools} />
@@ -2132,6 +2237,7 @@ function PublicHome({
 }
 
 function DashboardShell({
+  appConfig,
   tools,
   cases,
   models,
@@ -2141,6 +2247,7 @@ function DashboardShell({
   onLogout,
   onToast
 }: {
+  appConfig?: PublicAppConfig | null;
   tools: Tool[];
   cases: CaseContent[];
   models: ModelCapability[];
@@ -2170,7 +2277,7 @@ function DashboardShell({
   return (
     <div className="dashboard-shell">
       <aside className="sidebar">
-        <Logo />
+        <Logo appConfig={appConfig} />
         <div className="side-nav">
           {nav.map(([key, label, icon]) => (
             <button key={key} className={active === key ? "active" : ""} onClick={() => setActive(key)}>
@@ -5125,6 +5232,7 @@ function App() {
     <>
       {view === "dashboard" && authed ? (
         <DashboardShell
+          appConfig={data.appConfig}
           tools={data.tools}
           cases={data.cases}
           models={data.models}
@@ -5135,7 +5243,7 @@ function App() {
           onToast={toastApi}
         />
       ) : (
-        <PublicShell authed={authed} onLogin={() => setAuthOpen(true)} onOpenDashboard={() => setView("dashboard")}>
+        <PublicShell appConfig={data.appConfig} authed={authed} onLogin={() => setAuthOpen(true)} onOpenDashboard={() => setView("dashboard")}>
           {shareTicket ? (
             <ShareWorkPage
               ticket={shareTicket}

@@ -16,7 +16,7 @@ https://api.seefactory.xyz/api/v1
 
 ## 当前能力
 
-- 公开首页：工具矩阵、Workflow 案例、公开作品广场、模型能力、读取 `/credits/recharge-settings` 的价格说明。
+- 公开首页：读取 `/app/config` 渲染品牌名称、Logo、首页视频/海报、遮罩透明度和主卡片透明度，并展示工具矩阵、Workflow 案例、公开作品广场、模型能力、读取 `/credits/recharge-settings` 的价格说明。
 - 登录：PC H5 支持 Google、X、Telegram Login Widget。
 - 普通创作：从后端 `/tools` 渲染工具、模式、字段、素材槽位、比例、分辨率、视频精度和点数消耗。
 - 我的作品：私有作品库、状态/工具筛选、预览、下载、发布/取消发布广场、分享链接、再次生成、删除和失败作品清理。
@@ -122,6 +122,7 @@ dist/
 ## 关键接口
 
 - `GET /tools`
+- `GET /app/config`
 - `GET /components?pageSize=100&clientRuntime=h5-google`
 - `GET /case-contents?caseType=workflow&pageSize=8`
 - `GET /gallery/works`
@@ -178,6 +179,7 @@ dist/
 ## 约束
 
 - 工具、模型、比例、分辨率、视频精度、点数消耗和素材槽位均以后端配置为准，前端不得写死业务模型。
+- 品牌名称、Logo、公开首页视频背景、海报、遮罩透明度和主卡片透明度均以 `/app/config` 为准；`docs/logo.png` 自动映射到 Dashboard 静态资源 `/logo.png` 兜底。
 - PC Dashboard 只展示 Crypto 充值主路径，不展示微信、支付宝、抖音、QQ 或 Telegram Stars 支付。
 - 用户端不开放登录身份解绑；身份绑定、解绑、恢复和主身份设置由 Admin 审计操作。
 - 未登录用户可浏览公开工具、案例、作品广场、分享页、模型能力和价格说明；生成、同款创作、充值、作品库、下载私有作品等操作按后端鉴权执行。
