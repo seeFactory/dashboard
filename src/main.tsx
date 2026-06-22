@@ -469,6 +469,13 @@ type CustomerServiceConfig = {
   note?: string;
 };
 
+type FaqItem = {
+  question: string;
+  answer: string;
+  category?: string;
+  sort?: number;
+};
+
 type AgreementType = "user" | "privacy" | "creator" | "agent";
 
 type Agreement = {
@@ -632,6 +639,7 @@ function usePublicData() {
   const [models, setModels] = useState<ModelCapability[]>([]);
   const [components, setComponents] = useState<ComponentDefinition[]>([]);
   const [customerService, setCustomerService] = useState<CustomerServiceConfig | null>(null);
+  const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -643,9 +651,10 @@ function usePublicData() {
       settle(apiGet<PageData<Work>>("/gallery/works?pageSize=12")),
       settle(apiGet<PageData<ModelCapability>>("/models?pageSize=12")),
       settle(apiGet<PageData<ComponentDefinition>>("/components?pageSize=100&clientRuntime=h5-google")),
-      settle(apiGet<CustomerServiceConfig>("/customer-service"))
+      settle(apiGet<CustomerServiceConfig>("/customer-service")),
+      settle(apiGet<{ list: FaqItem[] }>("/faqs"))
     ])
-      .then(([toolResult, caseResult, galleryResult, modelResult, componentResult, customerResult]) => {
+      .then(([toolResult, caseResult, galleryResult, modelResult, componentResult, customerResult, faqResult]) => {
         if (!mounted) return;
         setTools(toolResult.ok ? toolResult.value : []);
         setCases(caseResult.ok ? caseResult.value.list || [] : []);
@@ -653,13 +662,15 @@ function usePublicData() {
         setModels(modelResult.ok ? modelResult.value.list || [] : []);
         setComponents(componentResult.ok ? componentResult.value.list || [] : []);
         setCustomerService(customerResult.ok ? customerResult.value : null);
+        setFaqs(faqResult.ok ? faqResult.value.list || [] : []);
         const errors = [
           toolResult.ok ? "" : `工具配置：${toolResult.reason?.message || "加载失败"}`,
           caseResult.ok ? "" : `案例配置：${caseResult.reason?.message || "加载失败"}`,
           galleryResult.ok ? "" : `作品广场：${galleryResult.reason?.message || "加载失败"}`,
           modelResult.ok ? "" : `模型能力：${modelResult.reason?.message || "加载失败"}`,
           componentResult.ok ? "" : `组件定义：${componentResult.reason?.message || "加载失败"}`,
-          customerResult.ok ? "" : `客服配置：${customerResult.reason?.message || "加载失败"}`
+          customerResult.ok ? "" : `客服配置：${customerResult.reason?.message || "加载失败"}`,
+          faqResult.ok ? "" : `FAQ：${faqResult.reason?.message || "加载失败"}`
         ].filter(Boolean);
         setError(errors.join("；"));
       })
@@ -669,7 +680,7 @@ function usePublicData() {
     };
   }, []);
 
-  return { tools, cases, galleryWorks, models, components, customerService, loading, error };
+  return { tools, cases, galleryWorks, models, components, customerService, faqs, loading, error };
 }
 
 function Logo() {
@@ -1863,10 +1874,12 @@ function telegramLink(value?: string) {
 
 function SupportPanel({
   customerService,
+  faqs,
   onToast,
   compact = false
 }: {
   customerService?: CustomerServiceConfig | null;
+  faqs?: FaqItem[];
   onToast: (toast: Toast) => void;
   compact?: boolean;
 }) {
@@ -1924,8 +1937,51 @@ function SupportPanel({
           </article>
         ) : null}
       </div>
+      <FaqPanel faqs={faqs || []} />
       <AgreementLinks onToast={onToast} />
     </section>
+  );
+}
+
+function FaqPanel({ faqs }: { faqs: FaqItem[] }) {
+  const grouped = faqs.reduce<Array<{ category: string; items: FaqItem[] }>>((acc, item) => {
+    const category = item.category || "常见问题";
+    const existing = acc.find((group) => group.category === category);
+    if (existing) {
+      existing.items.push(item);
+    } else {
+      acc.push({ category, items: [item] });
+    }
+    return acc;
+  }, []);
+
+  return (
+    <div className="faq-panel">
+      <div className="section-title-row">
+        <div>
+          <span className="eyebrow">FAQ</span>
+          <h2>常见问题</h2>
+        </div>
+        <span className="section-note">FAQ 由后端 AppConfig 配置，Dashboard 不硬编码业务规则</span>
+      </div>
+      {grouped.length ? (
+        <div className="faq-grid">
+          {grouped.map((group, groupIndex) => (
+            <article className="faq-group" key={group.category}>
+              <span>{group.category}</span>
+              {group.items.map((item, itemIndex) => (
+                <details key={`${group.category}-${item.question}`} open={groupIndex === 0 && itemIndex === 0}>
+                  <summary>{item.question}</summary>
+                  <p>{item.answer}</p>
+                </details>
+              ))}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyBlock title="暂无 FAQ 配置" body="请在 Admin 应用配置中维护 faq.items 后再展示帮助问答。" />
+      )}
+    </div>
   );
 }
 
@@ -2001,7 +2057,15 @@ function AgreementLinks({ onToast }: { onToast: (toast: Toast) => void }) {
   );
 }
 
-function PricingHelp({ customerService, onToast }: { customerService?: CustomerServiceConfig | null; onToast: (toast: Toast) => void }) {
+function PricingHelp({
+  customerService,
+  faqs,
+  onToast
+}: {
+  customerService?: CustomerServiceConfig | null;
+  faqs?: FaqItem[];
+  onToast: (toast: Toast) => void;
+}) {
   return (
     <>
       <section id="pricing" className="content-band pricing-grid">
@@ -2021,7 +2085,7 @@ function PricingHelp({ customerService, onToast }: { customerService?: CustomerS
           <p>首期不做工单，只展示客服渠道和跳转链接。页面文案默认全中文。</p>
         </article>
       </section>
-      <SupportPanel customerService={customerService} onToast={onToast} compact />
+      <SupportPanel customerService={customerService} faqs={faqs} onToast={onToast} compact />
     </>
   );
 }
@@ -2049,7 +2113,7 @@ function PublicHome({
       <CaseSquare cases={data.cases} />
       <GalleryPanel tools={data.tools} initialWorks={data.galleryWorks} authed={authed} onLogin={onLogin} onToast={onToast} compact />
       <ModelTable models={data.models} />
-      <PricingHelp customerService={data.customerService} onToast={onToast} />
+      <PricingHelp customerService={data.customerService} faqs={data.faqs} onToast={onToast} />
     </>
   );
 }
@@ -2060,6 +2124,7 @@ function DashboardShell({
   models,
   components,
   customerService,
+  faqs,
   onLogout,
   onToast
 }: {
@@ -2068,6 +2133,7 @@ function DashboardShell({
   models: ModelCapability[];
   components: ComponentDefinition[];
   customerService?: CustomerServiceConfig | null;
+  faqs?: FaqItem[];
   onLogout: () => void;
   onToast: (toast: Toast) => void;
 }) {
@@ -2126,7 +2192,7 @@ function DashboardShell({
         {active === "income" ? <IncomePanel /> : null}
         {active === "runs" ? <RunsPanel onToast={onToast} /> : null}
         {active === "wallet" ? <WalletPanel onToast={onToast} /> : null}
-        {active === "help" ? <SupportPanel customerService={customerService} onToast={onToast} /> : null}
+        {active === "help" ? <SupportPanel customerService={customerService} faqs={faqs} onToast={onToast} /> : null}
         {active === "account" ? <AccountPanel onToast={onToast} /> : null}
       </main>
     </div>
@@ -5051,6 +5117,7 @@ function App() {
           models={data.models}
           components={data.components}
           customerService={data.customerService}
+          faqs={data.faqs}
           onLogout={logout}
           onToast={toastApi}
         />
