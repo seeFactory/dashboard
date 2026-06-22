@@ -107,11 +107,14 @@ type WorkflowRunUploadState = Record<string, {
 
 type CaseContent = {
   id: string;
+  caseType?: "prompt" | "work" | "workflow";
   title: string;
   summary?: string;
   coverUrl?: string;
   category?: string;
   tags?: string[];
+  sourceId?: string;
+  toolKey?: string;
   licenseMode?: "open_free" | "closed_paid";
   pricePoints?: number;
   trialEnabled?: boolean;
@@ -136,6 +139,8 @@ type CaseContent = {
   runCount?: number;
   trialRunCount?: number;
   cloneCount?: number;
+  prompt?: string;
+  params?: Record<string, unknown>;
   runForm?: WorkflowRunForm;
   createdAt?: string;
   updatedAt?: string;
@@ -801,7 +806,7 @@ function usePublicData() {
     Promise.all([
       settle(apiGet<PublicAppConfig>("/app/config")),
       settle(apiGet<Tool[]>("/tools")),
-      settle(apiGet<PageData<CaseContent>>("/case-contents?caseType=workflow&pageSize=8")),
+      settle(apiGet<PageData<CaseContent>>("/case-contents?pageSize=12")),
       settle(apiGet<PageData<Work>>("/gallery/works?pageSize=12")),
       settle(apiGet<PageData<ModelCapability>>("/models?pageSize=12")),
       settle(apiGet<PageData<ComponentDefinition>>("/components?pageSize=100&clientRuntime=h5-google")),
@@ -1794,15 +1799,40 @@ function ToolMatrix({ tools }: { tools: Tool[] }) {
   );
 }
 
+function caseContentTypeLabel(item: CaseContent) {
+  if (item.caseType === "prompt") return "提示词案例";
+  if (item.caseType === "work") return "作品案例";
+  return "Workflow 案例";
+}
+
+function caseContentAccessLabel(item: CaseContent) {
+  if (item.caseType === "workflow") {
+    return item.licenseMode === "closed_paid" ? "闭源付费" : "开源免费";
+  }
+  if (item.caseType === "prompt") return "提示词可见";
+  return "公开作品";
+}
+
+function caseContentMetricLabel(item: CaseContent) {
+  if (item.caseType === "workflow") return `${formatPoints(item.pricePoints || 0)} 点`;
+  if (item.caseType === "prompt") return `${formatPoints(item.runCount || 0)} 次使用`;
+  return `${formatPoints(item.runCount || 0)} 次浏览`;
+}
+
+function caseContentTags(item: CaseContent) {
+  const tags = item.tags?.length ? item.tags : [item.category || item.caseType || "case"];
+  return tags.filter(Boolean).slice(0, 3);
+}
+
 function CaseSquare({ cases }: { cases: CaseContent[] }) {
   return (
     <section id="cases" className="content-band">
       <div className="section-title-row">
         <div>
           <span className="eyebrow">CaseContent</span>
-          <h2>公开案例与 Workflow 广场</h2>
+          <h2>公开案例广场</h2>
         </div>
-        <span className="section-note">开源可克隆导出，闭源付费只开放运行权</span>
+        <span className="section-note">提示词、公开作品与 Workflow 统一展示，权限由后端配置驱动</span>
       </div>
       {cases.length ? (
         <div className="case-layout">
@@ -1817,13 +1847,14 @@ function CaseSquare({ cases }: { cases: CaseContent[] }) {
               )}
               <div>
                 <div className="card-topline">
-                  <span>{item.licenseMode === "closed_paid" ? "闭源付费" : "开源免费"}</span>
-                  <span>{item.pricePoints || 0} 点</span>
+                  <span>{caseContentTypeLabel(item)}</span>
+                  <span>{caseContentAccessLabel(item)}</span>
+                  <span>{caseContentMetricLabel(item)}</span>
                 </div>
                 <h3>{item.title}</h3>
                 <p>{item.summary || "该案例摘要尚未配置。"}</p>
                 <div className="chip-row">
-                  {(item.tags || [item.category || "workflow"]).slice(0, 3).map((tag) => (
+                  {caseContentTags(item).map((tag) => (
                     <span key={tag}>{tag}</span>
                   ))}
                 </div>
@@ -1832,7 +1863,7 @@ function CaseSquare({ cases }: { cases: CaseContent[] }) {
           ))}
         </div>
       ) : (
-        <EmptyBlock title="暂无公开 Workflow 案例" body="请在 Dashboard 或 Admin 发布公开案例后再展示。" />
+        <EmptyBlock title="暂无公开案例" body="请在 Dashboard 或 Admin 发布提示词、作品或 Workflow 案例后再展示。" />
       )}
     </section>
   );

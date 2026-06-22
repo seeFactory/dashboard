@@ -102,7 +102,7 @@ for (const pattern of [
   "type PublicAppConfig",
   'apiGet<PublicAppConfig>("/app/config")',
   'apiGet<Tool[]>("/tools")',
-  'apiGet<PageData<CaseContent>>("/case-contents?caseType=workflow&pageSize=8")',
+  'apiGet<PageData<CaseContent>>("/case-contents?pageSize=12")',
   'apiGet<PageData<Work>>("/gallery/works?pageSize=12")',
   'apiGet<PageData<ModelCapability>>("/models?pageSize=12")',
   'apiGet<PageData<ComponentDefinition>>("/components?pageSize=100&clientRuntime=h5-google")',
@@ -123,12 +123,24 @@ for (const pattern of [
   "appConfig?.brand?.name",
   "home?.videoUrl",
   "暂无公开工具",
-  "暂无公开 Workflow 案例",
+  "暂无公开案例",
   "暂无公开作品",
   "暂无可用模型",
   "暂无组件定义"
 ]) {
   includes(pattern, `Dashboard backend-driven public data contract must include ${pattern}.`);
+}
+
+for (const pattern of [
+  'caseType?: "prompt" | "work" | "workflow"',
+  "function caseContentTypeLabel",
+  'return "提示词案例"',
+  'return "作品案例"',
+  'return "Workflow 案例"',
+  "公开案例广场",
+  "提示词、公开作品与 Workflow 统一展示"
+]) {
+  includes(pattern, `Dashboard unified CaseContent square contract must include ${pattern}.`);
 }
 
 for (const pattern of [
