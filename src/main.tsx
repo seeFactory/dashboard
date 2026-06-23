@@ -1788,6 +1788,40 @@ function HeroBackground({ home }: { home?: PublicAppConfig["home"] }) {
   );
 }
 
+const dashboardVisuals = {
+  hero: "/visuals/hero-control-room.jpg",
+  heroWide: "/visuals/hero-factory-wide.jpg",
+  image: "/visuals/image-studio.jpg",
+  video: "/visuals/video-timeline.jpg",
+  workflow: "/visuals/workflow-canvas.jpg",
+  gallery: "/visuals/gallery-wall.jpg",
+  model: "/visuals/model-lab.jpg",
+  market: "/visuals/workflow-market-wide.jpg"
+};
+
+const homeVisualFallbacks = [
+  dashboardVisuals.image,
+  dashboardVisuals.video,
+  dashboardVisuals.workflow,
+  dashboardVisuals.gallery,
+  dashboardVisuals.model,
+  dashboardVisuals.heroWide,
+  dashboardVisuals.market
+];
+
+function homeVisual(index = 0) {
+  return homeVisualFallbacks[Math.abs(index) % homeVisualFallbacks.length];
+}
+
+function toolVisualUrl(tool: Tool, index = 0) {
+  const category = String(tool.category || tool.outputTypes?.[0] || "").toLowerCase();
+  const fields = (tool.fields || []).join(" ").toLowerCase();
+  if (category.includes("video")) return dashboardVisuals.video;
+  if (fields.includes("workflow") || fields.includes("model")) return dashboardVisuals.workflow;
+  if (category.includes("image")) return dashboardVisuals.image;
+  return homeVisual(index);
+}
+
 function Hero({
   appConfig,
   tools,
@@ -1801,7 +1835,7 @@ function Hero({
 }) {
   const home = appConfig?.home;
   const brandName = appConfig?.brand?.name?.trim() || "seeFactory";
-  const posterUrl = resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl) || "/home-bg-poster.jpg";
+  const posterUrl = resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl) || dashboardVisuals.hero;
   const videoUrl = resolveConfigAssetUrl(home?.videoUrl);
   const imageTools = tools.filter((tool) => tool.category === "image");
   const videoTools = tools.filter((tool) => tool.category === "video");
@@ -1809,11 +1843,14 @@ function Hero({
   const videoTool = videoTools[0] || tools[1];
   const imageTool = imageTools[0] || tools[2];
   const workflowCount = tools.filter((tool) => (tool.fields || []).includes("model")).length;
+  const capabilityText = tools.length
+    ? `${tools.length} 个工具 · ${videoTools.length} 个视频能力 · ${workflowCount} 个模型化生成入口`
+    : "工具矩阵、视频能力与模型入口会持续开放";
 
   return (
     <section className="rh-hero" aria-label={brandName + " 首页"}>
       <div className="hero-tile hero-tile-tall">
-        <img src={posterUrl} alt="seeFactory 创作视觉" />
+        <img src={dashboardVisuals.image} alt="AI 图像创作空间" />
         <div className="tile-shade" />
         <div className="tile-copy bottom-left">
           <span>AI 图像工厂</span>
@@ -1823,7 +1860,7 @@ function Hero({
       </div>
 
       <div className="hero-tile hero-tile-main">
-        {videoUrl ? <video src={videoUrl} poster={posterUrl} autoPlay muted loop playsInline preload="metadata" /> : <img src={posterUrl} alt="seeFactory Workflow" />}
+        {videoUrl ? <video src={videoUrl} poster={posterUrl} autoPlay muted loop playsInline preload="metadata" /> : <img src={dashboardVisuals.hero} alt="seeFactory Workflow" />}
         <div className="tile-shade heavy" />
         <div className="tile-copy center-stage">
           <span>{home?.eyebrow?.trim() || "seeFactory 工作台"}</span>
@@ -1844,7 +1881,7 @@ function Hero({
 
       <div className="hero-side-stack">
         <div className="hero-tile hero-tile-small">
-          <img src={posterUrl} alt="热门模板" />
+          <img src={dashboardVisuals.workflow} alt="Workflow 模板编排" />
           <div className="tile-shade" />
           <div className="tile-copy bottom-left">
             <span>热门模板</span>
@@ -1852,6 +1889,7 @@ function Hero({
           </div>
         </div>
         <div className="invite-card">
+          <img className="invite-card-media" src={dashboardVisuals.video} alt="" aria-hidden="true" />
           <span>AI 视频</span>
           <strong>{videoTool?.name || "视频工作流生成"}</strong>
           <button type="button" onClick={onStart}>进入工作台</button>
@@ -1861,9 +1899,27 @@ function Hero({
       <div className="hero-campaign">
         <div>
           <strong>{featuredTool?.name || "工具矩阵已上线"}</strong>
-          <span>{tools.length} 个工具 · {videoTools.length} 个视频能力 · {workflowCount} 个模型化生成入口</span>
+          <span>{capabilityText}</span>
         </div>
         <button type="button" onClick={onStart}>立即使用</button>
+      </div>
+
+      <div className="platform-routes" aria-label="分端入口">
+        <button type="button" className="platform-card primary" onClick={onStart}>
+          <span>桌面 Web</span>
+          <strong>进入 PC 创作工作台</strong>
+          <small>适合管理作品、编排 Workflow、购买模板和查看点数钱包。</small>
+        </button>
+        <a className="platform-card" href="https://app.seefactory.xyz" target="_blank" rel="noreferrer">
+          <span>移动端小程序</span>
+          <strong>打开移动创作入口</strong>
+          <small>适合快速提交图像、视频任务，查看作品进度和下载结果。</small>
+        </a>
+        <a className="platform-card" href="https://tma.seefactory.xyz" target="_blank" rel="noreferrer">
+          <span>Telegram Mini App</span>
+          <strong>打开 Telegram 版本</strong>
+          <small>适合在 Telegram 内登录、充值和运行工具。</small>
+        </a>
       </div>
     </section>
   );
@@ -1882,9 +1938,13 @@ function ToolMatrix({ tools }: { tools: Tool[] }) {
       </div>
       {featured.length ? (
         <div className="tool-grid rh-tool-grid">
-          {featured.map((tool, index) => (
+          {featured.map((tool, index) => {
+            const visualUrl = toolVisualUrl(tool, index);
+            return (
             <article className={index === 0 ? "tool-card rh-tool-card hero-tool" : "tool-card rh-tool-card"} key={tool.toolKey}>
               <div className="tool-card-visual" data-kind={tool.category === "video" ? "video" : "image"}>
+                <img src={visualUrl} alt="" aria-hidden="true" loading="lazy" />
+                <div className="tile-shade" />
                 <Icon name={tool.category === "video" ? "video" : "image"} />
                 <span>{tool.category === "video" ? "AI 视频" : "AI 图像"}</span>
               </div>
@@ -1900,7 +1960,8 @@ function ToolMatrix({ tools }: { tools: Tool[] }) {
                 ))}
               </div>
             </article>
-          ))}
+          );
+          })}
         </div>
       ) : (
         <EmptyBlock title="暂无公开工具" body="工具库正在整理中，请稍后再来查看。" />
@@ -1909,7 +1970,7 @@ function ToolMatrix({ tools }: { tools: Tool[] }) {
   );
 }
 
-function contentCoverUrl(item?: { coverUrl?: string } | null, fallback = "/home-bg-poster.jpg") {
+function contentCoverUrl(item?: { coverUrl?: string } | null, fallback = dashboardVisuals.hero) {
   return resolveConfigAssetUrl(item?.coverUrl || fallback);
 }
 
@@ -1930,12 +1991,11 @@ function HomeChannelStrip({
   galleryWorks: Work[];
   onStart: () => void;
 }) {
-  const poster = "/home-bg-poster.jpg";
   const tiles = [
-    { title: cases[0]?.title || "产品主图到社媒海报", label: "一键同款", image: contentCoverUrl(cases[0], poster) },
-    { title: cases[1]?.title || "品牌活动短视频分镜", label: "Workflow 模板", image: contentCoverUrl(cases[1], poster) },
-    { title: galleryWorks[0]?.galleryTitle || galleryWorks[0]?.title || "公开作品精选", label: "作品广场", image: contentCoverUrl(galleryWorks[0], poster) },
-    { title: tools[0]?.name || "首个公开工具", label: "热门工具", image: poster }
+    { title: cases[0]?.title || "图像创作模板入口", label: "一键同款", image: contentCoverUrl(cases[0], dashboardVisuals.image) },
+    { title: cases[1]?.title || "视频 Workflow 入口", label: "Workflow 模板", image: contentCoverUrl(cases[1], dashboardVisuals.workflow) },
+    { title: galleryWorks[0]?.galleryTitle || galleryWorks[0]?.title || "作品广场精选入口", label: "作品广场", image: contentCoverUrl(galleryWorks[0], dashboardVisuals.gallery) },
+    { title: tools[0]?.name || "热门工具入口", label: "热门工具", image: toolVisualUrl(tools[0] || ({} as Tool), 0) }
   ];
   return (
     <section className="rh-hot-strip" aria-label="热门模板">
@@ -2001,7 +2061,7 @@ function HomeCaseDeck({
         <div className="case-deck-grid">
           {cases.slice(0, 8).map((item, index) => (
             <article className={index < 2 ? "case-deck-card featured" : "case-deck-card"} key={item.id}>
-              <img src={contentCoverUrl(item)} alt={item.title} loading="lazy" />
+              <img src={contentCoverUrl(item, homeVisual(index + 2))} alt={item.title} loading="lazy" />
               <div className="tile-shade" />
               <div className="case-deck-body">
                 <div className="card-topline">
@@ -2059,10 +2119,10 @@ function HomeGalleryPreview({
       {works.length ? (
         <div className="gallery-preview-grid">
           {works.slice(0, 10).map((work, index) => {
-            const url = workPreviewUrl(work);
+            const url = workPreviewUrl(work) || homeVisual(index + 3);
             return (
               <button type="button" className={index === 0 ? "gallery-preview-card featured" : "gallery-preview-card"} key={work.id} onClick={() => openWork(work)}>
-                {url ? (isVideoUrl(url) || work.contentType === "video" ? <video src={url} preload="metadata" /> : <img src={url} alt={workTitle(work)} loading="lazy" />) : <span className="case-cover-placeholder">暂无预览</span>}
+                {isVideoUrl(url) || work.contentType === "video" ? <video src={url} preload="metadata" /> : <img src={url} alt={workTitle(work)} loading="lazy" />}
                 <div className="tile-shade" />
                 <strong>{work.galleryTitle || work.title || "未命名作品"}</strong>
                 <span>{work.author?.nickname || "seeFactory 用户"} · {work.toolKey || "创作工具"}</span>
@@ -2072,6 +2132,7 @@ function HomeGalleryPreview({
         </div>
       ) : (
         <div className="empty-gallery-wall">
+          <img src={dashboardVisuals.gallery} alt="" aria-hidden="true" />
           <strong>作品广场正在等待第一批精选内容</strong>
           <span>这里会汇集用户公开发布的图像与视频作品。</span>
         </div>
