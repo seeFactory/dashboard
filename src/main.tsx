@@ -733,6 +733,7 @@ const refreshTokenKey = "seefactory.dashboard.refreshToken";
 const pendingPublicActionKey = "seefactory.dashboard.pendingPublicAction";
 const xCodeVerifierKey = "seefactory.dashboard.xCodeVerifier";
 const xRedirectUriKey = "seefactory.dashboard.xRedirectUri";
+const sidebarCollapsedKey = "seefactory.dashboard.sidebarCollapsed";
 
 function authHeaders(auth = false, runtime = "h5-google") {
   const headers: Record<string, string> = {
@@ -3271,45 +3272,99 @@ function DashboardShell({
   const routeWorkId = currentDashboardWorkId();
   const routeWorkflowId = currentDashboardWorkflowId();
   const routeWorkflowMode = currentDashboardWorkflowMode();
-  const nav = [
-    ["overview", "工作台", "panel"],
-    ["create", "创作工具", "image"],
-    ["works", "我的作品", "gallery"],
-    ["showcase", "公开广场", "gallery"],
-    ["workflow", "Workflow", "nodes"],
-    ["cases", "案例市场", "gallery"],
-    ["purchases", "已购模板", "badge"],
-    ["income", "创作者收益", "wallet"],
-    ["runs", "运行记录", "list"],
-    ["models", "模型能力", "nodes"],
-    ["pricing", "价格说明", "wallet"],
-    ["wallet", "钱包", "wallet"],
-    ["help", "帮助中心", "mail"],
-    ["account", "账户", "user"]
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem(sidebarCollapsedKey) === "true");
+  const navGroups: Array<{
+    title: string;
+    items: Array<{ key: string; label: string; icon: string }>;
+  }> = [
+    {
+      title: "创作",
+      items: [
+        { key: "overview", label: "工作台", icon: "panel" },
+        { key: "create", label: "创作工具", icon: "image" },
+        { key: "works", label: "我的作品", icon: "gallery" },
+        { key: "showcase", label: "公开广场", icon: "gallery" }
+      ]
+    },
+    {
+      title: "Workflow",
+      items: [
+        { key: "workflow", label: "Workflow", icon: "nodes" },
+        { key: "cases", label: "案例市场", icon: "gallery" },
+        { key: "purchases", label: "已购模板", icon: "badge" },
+        { key: "runs", label: "运行记录", icon: "list" }
+      ]
+    },
+    {
+      title: "能力与资产",
+      items: [
+        { key: "models", label: "模型能力", icon: "nodes" },
+        { key: "wallet", label: "钱包", icon: "wallet" },
+        { key: "income", label: "创作者收益", icon: "wallet" },
+        { key: "pricing", label: "价格说明", icon: "wallet" }
+      ]
+    },
+    {
+      title: "账户",
+      items: [
+        { key: "help", label: "帮助中心", icon: "mail" },
+        { key: "account", label: "账户设置", icon: "user" }
+      ]
+    }
   ];
-  const title = nav.find(([key]) => key === active)?.[1] || "工作台";
+  const nav = navGroups.flatMap((group) => group.items);
+  const title = nav.find((item) => item.key === active)?.label || "工作台";
+  const handleSidebarCollapse = () => {
+    setSidebarCollapsed((value) => {
+      const next = !value;
+      localStorage.setItem(sidebarCollapsedKey, String(next));
+      return next;
+    });
+  };
 
   return (
-    <div className="dashboard-shell rh-dashboard-shell">
-      <aside className="sidebar rh-sidebar">
-        <Logo appConfig={appConfig} />
+    <div className={`dashboard-shell rh-dashboard-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      <aside className={`sidebar rh-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
+        <div className="sidebar-head">
+          <Logo appConfig={appConfig} />
+          <button
+            className="icon-button sidebar-collapse-button"
+            type="button"
+            aria-label={sidebarCollapsed ? "展开侧边导航" : "折叠侧边导航"}
+            title={sidebarCollapsed ? "展开侧边导航" : "折叠侧边导航"}
+            onClick={handleSidebarCollapse}
+          >
+            <Icon name={sidebarCollapsed ? "panel" : "close"} />
+          </button>
+        </div>
         <div className="side-nav">
-          {nav.map(([key, label, icon]) => (
-            <button key={key} className={active === key ? "active" : ""} onClick={() => onNavigate(key)}>
-              <Icon name={icon} />
-              {label}
-            </button>
+          {navGroups.map((group) => (
+            <div className="side-nav-group" key={group.title}>
+              <span className="side-nav-title">{group.title}</span>
+              {group.items.map((item) => (
+                <button
+                  key={item.key}
+                  className={active === item.key ? "active" : ""}
+                  title={item.label}
+                  aria-label={item.label}
+                  onClick={() => onNavigate(item.key)}
+                >
+                  <Icon name={item.icon} />
+                  <span className="side-nav-label">{item.label}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
         <Button variant="ghost" onClick={onLogout}>
           <Icon name="logout" />
-          退出登录
+          <span className="side-nav-label">退出登录</span>
         </Button>
       </aside>
       <main className="workspace rh-workspace">
         <header className="workspace-head rh-workspace-head">
           <div>
-          <span className="eyebrow">创作工作台</span>
+            <span className="eyebrow">创作工作台</span>
             <h1>{title}</h1>
           </div>
           <Button variant="primary" onClick={() => onToast({ title: "已创建空白 Workflow 草稿", tone: "success" })}>
@@ -3347,29 +3402,119 @@ function Overview({
   models: ModelCapability[];
   components: ComponentDefinition[];
 }) {
+  const workflowCases = cases.filter((item) => item.caseType === "workflow");
+  const featuredTools = tools.slice(0, 4);
+  const featuredCases = workflowCases.slice(0, 4);
+  const modelPreview = models.slice(0, 5);
+  const componentPreview = components.slice(0, 5);
+  const onlineModelCount = models.filter((item) => !item.status || ["enabled", "active", "online", "available"].includes(item.status)).length || models.length;
+  const linearComponentCount = components.filter((item) => item.allowedInLinear !== false).length;
+
   return (
-    <div className="workspace-grid overview-grid">
-      <div className="metric-card">
-        <span>可用工具</span>
-        <strong>{tools.length}</strong>
-      </div>
-      <div className="metric-card">
-        <span>公开 Workflow</span>
-        <strong>{cases.filter((item) => item.caseType === "workflow").length}</strong>
-      </div>
-      <div className="metric-card">
-        <span>在线模型</span>
-        <strong>{models.length}</strong>
-      </div>
-      <div className="metric-card">
-        <span>Workflow 组件</span>
-        <strong>{components.length}</strong>
-      </div>
-      <div className="wide-panel spotlight-panel">
-            <span className="eyebrow">下一步</span>
-        <h2>从工具到 Workflow 的一体化创作台</h2>
-        <p>选择工具生成作品，沉淀为案例，再把可复用步骤编排成模板发布到市场。</p>
-      </div>
+    <div className="overview-page">
+      <section className="overview-hero-panel">
+        <div className="overview-hero-copy">
+          <span className="eyebrow">seeFactory Console</span>
+          <h2>从单次生成到可复用工作流的创作工作台</h2>
+          <p>这里展示当前账号可使用的工具、公开案例、模型能力与 Workflow 组件。所有入口均来自后端配置，生成参数和点数消耗以实时配置为准。</p>
+        </div>
+        <div className="overview-hero-stack" aria-label="当前工作台状态">
+          <span>{tools.length} 个创作工具</span>
+          <span>{workflowCases.length} 个 Workflow 案例</span>
+          <span>{onlineModelCount} 个在线模型</span>
+        </div>
+      </section>
+
+      <section className="overview-metrics">
+        <div className="metric-card overview-metric-card">
+          <span>可用工具</span>
+          <strong>{tools.length}</strong>
+          <small>由管理后台控制显隐、排序和可用模型</small>
+        </div>
+        <div className="metric-card overview-metric-card">
+          <span>公开 Workflow</span>
+          <strong>{workflowCases.length}</strong>
+          <small>可浏览、购买或运行的公开模板</small>
+        </div>
+        <div className="metric-card overview-metric-card">
+          <span>在线模型</span>
+          <strong>{onlineModelCount}</strong>
+          <small>模型能力、比例和精度由服务端下发</small>
+        </div>
+        <div className="metric-card overview-metric-card">
+          <span>线性组件</span>
+          <strong>{linearComponentCount}</strong>
+          <small>可用于拼装简易 Workflow 的组件</small>
+        </div>
+      </section>
+
+      <section className="overview-panels">
+        <article className="wide-panel overview-list-panel">
+          <div className="card-topline">
+            <span>创作入口</span>
+            <small>工具配置</small>
+          </div>
+          <h3>当前可用工具</h3>
+          <ul className="overview-list">
+            {featuredTools.length ? featuredTools.map((tool) => (
+              <li key={tool.toolKey}>
+                <Icon name={tool.category?.toLowerCase().includes("video") ? "video" : "image"} />
+                <div>
+                  <strong>{tool.name}</strong>
+                  <small>{tool.description || tool.category || "后台配置的创作工具"}</small>
+                </div>
+                <b>{typeof tool.cost === "number" ? `${tool.cost} 点` : "按配置计费"}</b>
+              </li>
+            )) : <li className="overview-empty-line">后台启用创作工具后会显示在这里。</li>}
+          </ul>
+        </article>
+
+        <article className="wide-panel overview-list-panel">
+          <div className="card-topline">
+            <span>案例市场</span>
+            <small>Workflow</small>
+          </div>
+          <h3>公开 Workflow 案例</h3>
+          <ul className="overview-list">
+            {featuredCases.length ? featuredCases.map((item) => (
+              <li key={item.id}>
+                <Icon name="nodes" />
+                <div>
+                  <strong>{item.title}</strong>
+                  <small>{item.summary || item.category || "公开 Workflow 案例"}</small>
+                </div>
+                <b>{item.licenseMode === "closed_paid" ? `${item.pricePoints || 0} 点` : "免费"}</b>
+              </li>
+            )) : <li className="overview-empty-line">公开 Workflow 案例上线后会显示在这里。</li>}
+          </ul>
+        </article>
+
+        <article className="wide-panel overview-capability-panel">
+          <div className="card-topline">
+            <span>模型能力</span>
+            <small>{models.length} 项</small>
+          </div>
+          <h3>已同步模型</h3>
+          <div className="overview-chip-cloud">
+            {modelPreview.length ? modelPreview.map((model) => (
+              <span key={model.id}>{model.name || model.modelKey}</span>
+            )) : <span>暂无模型配置</span>}
+          </div>
+        </article>
+
+        <article className="wide-panel overview-capability-panel">
+          <div className="card-topline">
+            <span>组件能力</span>
+            <small>{components.length} 项</small>
+          </div>
+          <h3>可编排组件</h3>
+          <div className="overview-chip-cloud">
+            {componentPreview.length ? componentPreview.map((component) => (
+              <span key={component.id}>{component.displayName || component.label || component.componentKey}</span>
+            )) : <span>暂无组件配置</span>}
+          </div>
+        </article>
+      </section>
     </div>
   );
 }

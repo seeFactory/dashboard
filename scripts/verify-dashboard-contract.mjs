@@ -443,7 +443,7 @@ for (const pattern of [
 }
 
 for (const pattern of [
-  '["works", "我的作品", "gallery"]',
+  '{ key: "works", label: "我的作品", icon: "gallery" }',
   "favorited?: boolean",
   "function WorksPanel",
   'apiGet<PageData<Work>>(`/works?${params.toString()}`',
@@ -472,7 +472,7 @@ for (const pattern of [
 }
 
 for (const pattern of [
-  '["showcase", "公开广场", "gallery"]',
+  '{ key: "showcase", label: "公开广场", icon: "gallery" }',
   "function GalleryPanel",
   "`/gallery/works?${params.toString()}`",
   "`/gallery/works/${work.id}`",
@@ -522,7 +522,7 @@ for (const pattern of [
 }
 
 for (const pattern of [
-  '["help", "帮助中心", "mail"]',
+  '{ key: "help", label: "帮助中心", icon: "mail" }',
   "type CustomerServiceConfig",
   "type FaqItem",
   "type AgreementType",
