@@ -268,6 +268,27 @@ type WorkflowPurchase = {
   public?: boolean;
   deletedByAuthorAt?: string;
   purchasedAt?: string;
+  creator?: {
+    id: string;
+    nickname?: string;
+    avatarUrl?: string;
+  };
+  versionLabel?: string;
+  purchasedVersion?: {
+    id: string;
+    version?: number;
+    title?: string;
+  };
+  lastRun?: {
+    id: string;
+    status?: string;
+    isTrial?: boolean;
+    createdAt?: string;
+    finishedAt?: string;
+    failureReason?: string;
+  };
+  lastRunAt?: string;
+  lastRunStatus?: string;
   case?: CaseContent;
   version?: {
     title?: string;
@@ -1149,6 +1170,20 @@ function workflowLifecycleNote(source?: WorkflowLifecycleFields | null, purchase
 
 function workflowPurchaseLifecycleSource(item?: WorkflowPurchase | null): WorkflowLifecycleFields | null {
   return item?.case || item || null;
+}
+
+function workflowPurchaseCreatorName(item?: WorkflowPurchase | null) {
+  return item?.creator?.nickname || "seeFactory 创作者";
+}
+
+function workflowPurchaseVersionLabel(item?: WorkflowPurchase | null) {
+  return item?.versionLabel || (item?.purchasedVersion?.version ? `v${item.purchasedVersion.version}` : "发布版本");
+}
+
+function workflowPurchaseLastRunText(item?: WorkflowPurchase | null) {
+  if (!item?.lastRunAt) return "暂无运行";
+  const runKind = item.lastRun?.isTrial ? "试运行" : "正式运行";
+  return `${runKind} ${paymentStatusLabel(item.lastRunStatus)} · ${formatDate(item.lastRunAt)}`;
 }
 
 function formatCnyFromCents(value?: number) {
@@ -5359,8 +5394,12 @@ function PurchasedTemplates({ onToast }: { onToast: (toast: Toast) => void }) {
             <h3>{item.case?.title || item.version?.title || "Workflow 模板"}</h3>
             <p>{item.case?.summary || item.version?.summary || workflowBlockedReason(item) || "已购买的闭源模板，可继续调度运行。"}</p>
             <div className="mini-meta">
+              <span>作者 {workflowPurchaseCreatorName(item)}</span>
+              <span>{workflowPurchaseVersionLabel(item)}</span>
               <span>{item.pricePoints || 0} 点</span>
               <span>{item.purchasedAt ? formatDate(item.purchasedAt) : "永久权益"}</span>
+              <span>{workflowPurchaseLastRunText(item)}</span>
+              {item.hasReplacementModel || item.replacementAvailable ? <span>存在替代模型</span> : null}
               <span className={`lifecycle ${lifecycle.tone}`}>{lifecycle.label}</span>
             </div>
             {lifecycleNote ? <p className="workflow-lifecycle-note">{lifecycleNote}</p> : null}
