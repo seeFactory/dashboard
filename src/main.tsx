@@ -344,6 +344,7 @@ type Work = {
   shareTicket?: string;
   viewCount?: number;
   likeCount?: number;
+  favorited?: boolean;
   author?: {
     nickname?: string;
     avatarUrl?: string;
@@ -581,7 +582,7 @@ type Toast = {
 };
 
 type PendingPublicAction = {
-  type: "gallery-download" | "gallery-rerun" | "share-download" | "share-rerun" | "case-rerun" | "case-download" | "case-favorite" | "case-workflow";
+  type: "gallery-download" | "gallery-rerun" | "gallery-favorite" | "share-download" | "share-rerun" | "share-favorite" | "case-rerun" | "case-download" | "case-favorite" | "case-workflow";
   workId?: string;
   ticket?: string;
   caseId?: string;
@@ -1378,8 +1379,10 @@ function isPendingPublicAction(value: unknown): value is PendingPublicAction {
   return [
     "gallery-download",
     "gallery-rerun",
+    "gallery-favorite",
     "share-download",
     "share-rerun",
+    "share-favorite",
     "case-rerun",
     "case-download",
     "case-favorite",
@@ -2239,6 +2242,11 @@ function GalleryPanel({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
 
+  const mergeGalleryWork = (next: Work) => {
+    setItems((current) => current.map((item) => item.id === next.id ? { ...item, ...next } : item));
+    setSelectedWork((current) => current?.id === next.id ? { ...current, ...next } : current);
+  };
+
   const loadGallery = () => {
     setLoading(true);
     setError("");
@@ -2348,19 +2356,49 @@ function GalleryPanel({
       .finally(() => setBusy(""));
   };
 
+  const toggleFavoriteWork = (work: Work | null) => {
+    if (!work?.id) return;
+    if (!authed) {
+      if (onRequireAuthAction) {
+        onRequireAuthAction({ type: "gallery-favorite", workId: work.id });
+      } else {
+        onLogin();
+      }
+      onToast({ title: "请先登录后再收藏作品", tone: "info" });
+      return;
+    }
+    setBusy(`favorite:${work.id}`);
+    const request = work.favorited
+      ? apiDelete<Work>(`/works/${work.id}/favorite`, { auth: true })
+      : apiPost<Work>(`/works/${work.id}/favorite`, {}, { auth: true });
+    request
+      .then((next) => {
+        mergeGalleryWork(next);
+        onToast({ title: next.favorited ? "已收藏作品" : "已取消收藏", tone: "success" });
+      })
+      .catch((err) => onToast({ title: err.message || "收藏操作失败", tone: "danger" }))
+      .finally(() => setBusy(""));
+  };
+
   useEffect(() => {
     if (!authed || !pendingAction?.workId) return;
-    if (pendingAction.type !== "gallery-download" && pendingAction.type !== "gallery-rerun") return;
-    const target = selectedWork?.id === pendingAction.workId
-      ? selectedWork
-      : items.find((item) => item.id === pendingAction.workId);
-    if (!target) return;
-    onActionConsumed?.();
-    if (pendingAction.type === "gallery-download") {
-      downloadGalleryWork(target);
-    } else {
-      rerunGalleryWork(target);
-    }
+    if (pendingAction.type !== "gallery-download" && pendingAction.type !== "gallery-rerun" && pendingAction.type !== "gallery-favorite") return;
+    const runPending = async () => {
+      const target = selectedWork?.id === pendingAction.workId
+        ? selectedWork
+        : items.find((item) => item.id === pendingAction.workId)
+          || await apiGet<Work>(`/gallery/works/${pendingAction.workId}`, { auth: true }).catch(() => null);
+      if (!target) return;
+      onActionConsumed?.();
+      if (pendingAction.type === "gallery-download") {
+        downloadGalleryWork(target);
+      } else if (pendingAction.type === "gallery-rerun") {
+        rerunGalleryWork(target);
+      } else {
+        toggleFavoriteWork(target);
+      }
+    };
+    runPending().catch(() => undefined);
   }, [authed, pendingAction, selectedWork, items]);
 
   return (
@@ -2448,6 +2486,7 @@ function GalleryPanel({
                 <span>{selectedWork.toolKey || "tool"}</span>
                 <span>{selectedWork.modeKey || "default"}</span>
                 <span>{formatDate(selectedWork.galleryPublishedAt || selectedWork.createdAt)}</span>
+                <span>{Number(selectedWork.likeCount || 0)} 收藏</span>
                 <span>{selectedWork.downloadEnabled === false ? "不可下载" : "允许下载"}</span>
               </div>
               <div className="work-prompt-panel">
@@ -2469,6 +2508,10 @@ function GalleryPanel({
                 <Button variant="ghost" onClick={() => copyPrompt(selectedWork)}>
                   <Icon name="copy" />
                   复制提示词
+                </Button>
+                <Button variant="ghost" onClick={() => toggleFavoriteWork(selectedWork)} disabled={Boolean(busy)}>
+                  <Icon name="badge" />
+                  {selectedWork.favorited ? "取消收藏" : "收藏作品"}
                 </Button>
                 <Button variant="ghost" onClick={() => downloadGalleryWork(selectedWork)} disabled={Boolean(busy) || selectedWork.downloadEnabled === false}>
                   <Icon name="download" />
@@ -3542,6 +3585,7 @@ function WorksPanel({
   const [selectedWork, setSelectedWork] = useState<Work | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [toolFilter, setToolFilter] = useState("");
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -3553,6 +3597,7 @@ function WorksPanel({
     const params = new URLSearchParams({ pageSize: "36" });
     if (statusFilter) params.set("status", statusFilter);
     if (toolFilter) params.set("toolKey", toolFilter);
+    if (favoriteOnly) params.set("favorited", "true");
     apiGet<PageData<Work>>(`/works?${params.toString()}`, { auth: true })
       .then((data) => {
         const list = data.list || [];
@@ -3571,7 +3616,7 @@ function WorksPanel({
 
   useEffect(() => {
     loadWorks();
-  }, [statusFilter, toolFilter, initialWorkId]);
+  }, [statusFilter, toolFilter, favoriteOnly, initialWorkId]);
 
   useEffect(() => {
     if (!initialWorkId || selectedWork?.id === initialWorkId) return;
@@ -3657,6 +3702,23 @@ function WorksPanel({
       .finally(() => setBusy(""));
   };
 
+  const toggleFavoriteWork = (work: Work | null) => {
+    if (!work?.id) return;
+    setBusy(`favorite:${work.id}`);
+    const request = work.favorited
+      ? apiDelete<Work>(`/works/${work.id}/favorite`, { auth: true })
+      : apiPost<Work>(`/works/${work.id}/favorite`, {}, { auth: true });
+    request
+      .then((next) => {
+        setSelectedWork(next);
+        setItems((current) => current.map((item) => item.id === next.id ? next : item));
+        onToast({ title: next.favorited ? "已收藏作品" : "已取消收藏", tone: "success" });
+        if (favoriteOnly && !next.favorited) loadWorks();
+      })
+      .catch((err) => onToast({ title: err.message || "收藏操作失败", tone: "danger" }))
+      .finally(() => setBusy(""));
+  };
+
   const deleteWork = (work: Work | null) => {
     if (!work?.id) return;
     setBusy(`delete:${work.id}`);
@@ -3724,6 +3786,10 @@ function WorksPanel({
             ))}
           </select>
         </label>
+        <button className={favoriteOnly ? "active" : ""} onClick={() => setFavoriteOnly((value) => !value)}>
+          <Icon name="badge" />
+          只看收藏
+        </button>
         <Button variant="ghost" onClick={clearFailedWorks} disabled={Boolean(busy)}>
           <Icon name="close" />
           {busy === "clear-failed" ? "清理中" : "清理失败作品"}
@@ -3780,6 +3846,7 @@ function WorksPanel({
             <div className="mini-meta">
               <span>{selectedWork.toolKey || "tool"}</span>
               <span>{selectedWork.modeKey || "default"}</span>
+              <span>{Number(selectedWork.likeCount || 0)} 收藏</span>
               <span>{selectedWork.galleryVisible ? "广场公开" : "私有"}</span>
               {selectedWork.isTrialOutput ? <span>试运行</span> : null}
               {selectedWork.isIntermediateOutput ? <span>中间结果</span> : null}
@@ -3831,6 +3898,10 @@ function WorksPanel({
               <Button variant="ghost" onClick={() => downloadWork(selectedWork)} disabled={Boolean(busy) || selectedWork.status !== "success" || selectedWork.lockedUntilPurchase}>
                 <Icon name="download" />
                 下载
+              </Button>
+              <Button variant="ghost" onClick={() => toggleFavoriteWork(selectedWork)} disabled={Boolean(busy)}>
+                <Icon name="badge" />
+                {selectedWork.favorited ? "取消收藏" : "收藏作品"}
               </Button>
               <Button variant="ghost" onClick={() => toggleGallery(selectedWork)} disabled={Boolean(busy) || selectedWork.status !== "success" || selectedWork.lockedUntilPurchase}>
                 <Icon name="gallery" />
@@ -6231,14 +6302,40 @@ function ShareWorkPage({
       .finally(() => setBusy(""));
   };
 
+  const toggleFavoriteSharedWork = () => {
+    if (!work?.id) return;
+    if (!authed) {
+      if (onRequireAuthAction) {
+        onRequireAuthAction({ type: "share-favorite", workId: work.id, ticket });
+      } else {
+        onLogin();
+      }
+      onToast({ title: "请先登录后再收藏作品", tone: "info" });
+      return;
+    }
+    setBusy("favorite");
+    const request = work.favorited
+      ? apiDelete<Work>(`/works/${work.id}/favorite`, { auth: true })
+      : apiPost<Work>(`/works/${work.id}/favorite`, {}, { auth: true });
+    request
+      .then((next) => {
+        setWork((current) => current ? { ...current, ...next, author: current.author } : next);
+        onToast({ title: next.favorited ? "已收藏作品" : "已取消收藏", tone: "success" });
+      })
+      .catch((err) => onToast({ title: err.message || "收藏操作失败", tone: "danger" }))
+      .finally(() => setBusy(""));
+  };
+
   useEffect(() => {
     if (!authed || !work?.id || pendingAction?.ticket !== ticket) return;
-    if (pendingAction.type !== "share-download" && pendingAction.type !== "share-rerun") return;
+    if (pendingAction.type !== "share-download" && pendingAction.type !== "share-rerun" && pendingAction.type !== "share-favorite") return;
     onActionConsumed?.();
     if (pendingAction.type === "share-download") {
       downloadSharedWork();
-    } else {
+    } else if (pendingAction.type === "share-rerun") {
       rerunSharedWork();
+    } else {
+      toggleFavoriteSharedWork();
     }
   }, [authed, work?.id, pendingAction, ticket]);
 
@@ -6259,6 +6356,7 @@ function ShareWorkPage({
               <span>{work.toolKey || "tool"}</span>
               <span>{work.modeKey || "default"}</span>
               <span>{formatDate(work.createdAt)}</span>
+              <span>{Number(work.likeCount || 0)} 收藏</span>
             </div>
             <div className="work-prompt-panel">
               <span>提示词</span>
@@ -6276,6 +6374,10 @@ function ShareWorkPage({
               <Button variant="ghost" onClick={downloadSharedWork} disabled={Boolean(busy) || work.downloadEnabled === false}>
                 <Icon name="download" />
                 下载
+              </Button>
+              <Button variant="ghost" onClick={toggleFavoriteSharedWork} disabled={Boolean(busy)}>
+                <Icon name="badge" />
+                {work.favorited ? "取消收藏" : "收藏作品"}
               </Button>
               <Button onClick={rerunSharedWork} disabled={Boolean(busy)}>
                 <Icon name="play" />
@@ -6374,7 +6476,7 @@ function App() {
     if (publicAction) {
       setPendingPublicAction(publicAction);
       setView("public");
-      if ((publicAction.type === "share-download" || publicAction.type === "share-rerun") && publicAction.ticket) {
+      if ((publicAction.type === "share-download" || publicAction.type === "share-rerun" || publicAction.type === "share-favorite") && publicAction.ticket) {
         replaceBrowserPath(`/share/${encodeURIComponent(publicAction.ticket || "")}`);
       } else {
         replaceBrowserPath("/");
