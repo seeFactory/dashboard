@@ -860,15 +860,15 @@ function usePublicData() {
         setFaqs(faqResult.ok ? faqResult.value.list || [] : []);
         setRechargePolicy(rechargeResult.ok ? rechargeResult.value : null);
         const errors = [
-          appConfigResult.ok ? "" : `公开配置：${appConfigResult.reason?.message || "加载失败"}`,
-          toolResult.ok ? "" : `工具配置：${toolResult.reason?.message || "加载失败"}`,
-          caseResult.ok ? "" : `案例配置：${caseResult.reason?.message || "加载失败"}`,
-          galleryResult.ok ? "" : `作品广场：${galleryResult.reason?.message || "加载失败"}`,
-          modelResult.ok ? "" : `模型能力：${modelResult.reason?.message || "加载失败"}`,
-          componentResult.ok ? "" : `组件定义：${componentResult.reason?.message || "加载失败"}`,
-          customerResult.ok ? "" : `客服配置：${customerResult.reason?.message || "加载失败"}`,
-          faqResult.ok ? "" : `FAQ：${faqResult.reason?.message || "加载失败"}`,
-          rechargeResult.ok ? "" : `充值配置：${rechargeResult.reason?.message || "加载失败"}`
+          appConfigResult.ok ? "" : "公开配置：" + (appConfigResult.reason?.message || "加载失败"),
+          toolResult.ok ? "" : "工具配置：" + (toolResult.reason?.message || "加载失败"),
+          caseResult.ok ? "" : "案例配置：" + (caseResult.reason?.message || "加载失败"),
+          galleryResult.ok ? "" : "作品广场：" + (galleryResult.reason?.message || "加载失败"),
+          modelResult.ok ? "" : "模型能力：" + (modelResult.reason?.message || "加载失败"),
+          componentResult.ok ? "" : "组件定义：" + (componentResult.reason?.message || "加载失败"),
+          customerResult.ok ? "" : "客服配置：" + (customerResult.reason?.message || "加载失败"),
+          faqResult.ok ? "" : "FAQ：" + (faqResult.reason?.message || "加载失败"),
+          rechargeResult.ok ? "" : "充值配置：" + (rechargeResult.reason?.message || "加载失败")
         ].filter(Boolean);
         setError(errors.join("；"));
       })
@@ -1542,8 +1542,8 @@ function removeOAuthQuery() {
 }
 
 function authSuccessText(provider: string, result: AuthResult) {
-  const name = result.user?.nickname ? `，${result.user.nickname}` : "";
-  return `${provider} 登录成功${name}`;
+  const name = result.user?.nickname ? "：" + result.user.nickname : "";
+  return provider + " 登录成功" + name;
 }
 
 function AuthModal({
@@ -1635,7 +1635,7 @@ function AuthModal({
       const codeVerifier = randomBase64Url();
       const codeChallenge = await sha256Base64Url(codeVerifier);
       const query = new URLSearchParams({ codeChallenge, redirectUri });
-      const result = await apiGet<{ authorizeUrl: string; state: string }>(`/auth/h5/x/authorize-url?${query.toString()}`, {
+      const result = await apiGet<{ authorizeUrl: string; state: string }>("/auth/h5/x/authorize-url?" + query.toString(), {
         runtime: "h5-x"
       });
       localStorage.setItem(xCodeVerifierKey, codeVerifier);
@@ -1652,7 +1652,7 @@ function AuthModal({
 
   return (
     <div className="modal-backdrop">
-      <div className="modal-panel">
+      <div className="modal-panel auth-modal-panel">
         <div className="modal-head">
           <div>
             <span className="eyebrow">登录 seeFactory</span>
@@ -1674,7 +1674,7 @@ function AuthModal({
                 {!googleReady ? <small>正在加载 Google 登录</small> : null}
               </>
             ) : (
-              <small>需配置 VITE_SEEFACTORY_GOOGLE_CLIENT_ID</small>
+              <small>需要配置 VITE_SEEFACTORY_GOOGLE_CLIENT_ID</small>
             )}
           </div>
           <button disabled={pendingProvider === "X"} onClick={handleXLogin}>
@@ -1689,7 +1689,7 @@ function AuthModal({
             {TELEGRAM_BOT_USERNAME ? (
               <div ref={telegramHostRef} className="telegram-widget-host" />
             ) : (
-              <small>需配置 VITE_SEEFACTORY_TELEGRAM_BOT_USERNAME</small>
+              <small>需要配置 VITE_SEEFACTORY_TELEGRAM_BOT_USERNAME</small>
             )}
           </div>
         </div>
@@ -1716,28 +1716,38 @@ function PublicShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="site-shell">
-      <header className="topbar">
+    <div className="site-shell runninghub-shell">
+      <div className="launch-strip">
+        <span>Workflow 画布与模板市场已开放</span>
+        <strong>模型、工具、案例统一由后端配置驱动</strong>
+        <button type="button" onClick={onOpenDashboard}>立即创作</button>
+      </div>
+      <header className="topbar rh-topbar">
         <Logo appConfig={appConfig} />
         <nav>
-          <a href="#tools">工具</a>
-          <a href="#cases">案例</a>
-          <a href="#showcase">作品广场</a>
+          <a href="#tools">探索</a>
+          <a href="#cases">模板</a>
+          <a href="#showcase">广场</a>
           <a href="#models">模型</a>
           <a href="#pricing">价格</a>
           <a href="#help">帮助</a>
         </nav>
-        {authed ? (
-          <Button variant="ghost" onClick={onOpenDashboard}>
-            <Icon name="panel" />
-            工作台
-          </Button>
-        ) : (
-          <Button variant="primary" onClick={onLogin}>
-            <Icon name="login" />
-            登录
-          </Button>
-        )}
+        <div className="topbar-actions">
+          <button type="button" className="search-fab" aria-label="搜索">
+            <Icon name="search" />
+          </button>
+          {authed ? (
+            <Button variant="ghost" onClick={onOpenDashboard}>
+              <Icon name="panel" />
+              工作台
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={onLogin}>
+              <Icon name="login" />
+              登录
+            </Button>
+          )}
+        </div>
       </header>
       {children}
     </div>
@@ -1781,95 +1791,96 @@ function Hero({
 }) {
   const home = appConfig?.home;
   const brandName = appConfig?.brand?.name?.trim() || "seeFactory";
-  const hasMedia = Boolean(home?.videoUrl || home?.posterUrl || home?.fallbackImageUrl);
-  const overlayOpacity = clampConfigNumber(home?.overlayOpacity, 0.24, 0.86, 0.58);
-  const mainCardOpacity = clampConfigNumber(home?.mainCardOpacity, 0.32, 0.9, 0.72);
-  const style = {
-    "--hero-overlay-opacity": String(overlayOpacity),
-    "--hero-card-opacity": String(mainCardOpacity)
-  } as React.CSSProperties;
-  const eyebrow = home?.eyebrow?.trim() || "PC Dashboard / public studio";
-  const headline = home?.headline?.trim() || "把模型、工具和 Workflow 放进同一个创作台";
-  const intro =
-    home?.subtitle?.trim() ||
-    `${brandName} Dashboard 面向桌面创作者：未登录可浏览公开工具、案例、提示词和模型能力；登录后进入作品库、钱包、已购模板库和 Workflow 控制台。`;
+  const posterUrl = resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl) || "/home-bg-poster.jpg";
+  const videoUrl = resolveConfigAssetUrl(home?.videoUrl);
+  const imageTools = tools.filter((tool) => tool.category === "image");
+  const videoTools = tools.filter((tool) => tool.category === "video");
+  const featuredTool = tools[0];
+  const videoTool = videoTools[0] || tools[1];
+  const imageTool = imageTools[0] || tools[2];
+  const workflowCount = tools.filter((tool) => (tool.fields || []).includes("model")).length;
 
   return (
-    <section className={`hero-section ${hasMedia ? "has-media" : ""}`} style={style}>
-      <HeroBackground home={home} />
-      <div className="hero-copy">
-        <span className="eyebrow">{eyebrow}</span>
-        <h1>{headline}</h1>
-        <p>{intro}</p>
-        <div className="hero-actions">
-          <Button onClick={onStart}>
-            <Icon name="play" />
-            进入工作台
-          </Button>
-          <Button variant="ghost" onClick={onShowcase}>
-            <Icon name="gallery" />
-            浏览广场
-          </Button>
+    <section className="rh-hero" aria-label={brandName + " 首页"}>
+      <div className="hero-tile hero-tile-tall">
+        <img src={posterUrl} alt="seeFactory 创作视觉" />
+        <div className="tile-shade" />
+        <div className="tile-copy bottom-left">
+          <span>AI Image Factory</span>
+          <strong>{imageTool?.name || "AI 图像工厂"}</strong>
+          <small>比例、分辨率、模型选择全部由 Admin 配置</small>
         </div>
       </div>
-      <div className="studio-preview" aria-label="Workflow 画布预览">
-        <div className="preview-toolbar">
-          <span>Workflow run form</span>
-          <strong>linear + graph</strong>
-        </div>
-        <div className="workflow-board">
-          <div className="component-rail">
-            {["提示词", "模型", "比例", "精度"].map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </div>
-          <div className="node-stack">
-            <div className="flow-node active">输入素材</div>
-            <div className="flow-line" />
-            <div className="flow-node">后端工具配置</div>
-            <div className="flow-line" />
-            <div className="flow-node accent">模型能力调度</div>
-            <div className="flow-line" />
-            <div className="flow-node">发布作品</div>
+
+      <div className="hero-tile hero-tile-main">
+        {videoUrl ? <video src={videoUrl} poster={posterUrl} autoPlay muted loop playsInline preload="metadata" /> : <img src={posterUrl} alt="seeFactory Workflow" />}
+        <div className="tile-shade heavy" />
+        <div className="tile-copy center-stage">
+          <span>{home?.eyebrow?.trim() || "seeFactory Dashboard"}</span>
+          <h1>{home?.headline?.trim() || "AI 内容工厂"}</h1>
+          <p>{home?.subtitle?.trim() || "对标内容创作平台的 PC 工作台：未登录可浏览工具、案例、模型和广场；登录后完成生成、下载、收藏、购买与 Workflow 编排。"}</p>
+          <div className="hero-actions">
+            <Button onClick={onStart}>
+              <Icon name="play" />
+              开始创作
+            </Button>
+            <Button variant="ghost" onClick={onShowcase}>
+              <Icon name="gallery" />
+              逛作品广场
+            </Button>
           </div>
         </div>
-        <div className="preview-tools">
-          {tools.length ? (
-            tools.slice(0, 3).map((tool) => (
-              <div key={tool.toolKey}>
-                <strong>{tool.name}</strong>
-                <span>{tool.cost || 0} 点</span>
-              </div>
-            ))
-          ) : (
-            <div>
-              <strong>等待工具配置</strong>
-              <span>请在 Admin 发布工具</span>
-            </div>
-          )}
+      </div>
+
+      <div className="hero-side-stack">
+        <div className="hero-tile hero-tile-small">
+          <img src={posterUrl} alt="热门模板" />
+          <div className="tile-shade" />
+          <div className="tile-copy bottom-left">
+            <span>Hot templates</span>
+            <strong>开源 / 闭源 Workflow 模板</strong>
+          </div>
         </div>
+        <div className="invite-card">
+          <span>AI Video</span>
+          <strong>{videoTool?.name || "视频工作流生成"}</strong>
+          <button type="button" onClick={onStart}>进入工作台</button>
+        </div>
+      </div>
+
+      <div className="hero-campaign">
+        <div>
+          <strong>{featuredTool?.name || "工具矩阵已上线"}</strong>
+          <span>{tools.length} 个工具 · {videoTools.length} 个视频能力 · {workflowCount} 个模型化生成入口</span>
+        </div>
+        <button type="button" onClick={onStart}>立即使用</button>
       </div>
     </section>
   );
 }
 
 function ToolMatrix({ tools }: { tools: Tool[] }) {
+  const featured = tools.slice(0, 12);
   return (
-    <section id="tools" className="content-band">
-      <div className="section-title-row">
+    <section id="tools" className="content-band rh-section tool-section">
+      <div className="section-title-row rh-title-row">
         <div>
-          <span className="eyebrow">Tools</span>
-          <h2>创作工具矩阵</h2>
+          <span className="eyebrow">Explore</span>
+          <h2>探索 seeFactory 工具</h2>
         </div>
-        <span className="section-note">模型、比例、分辨率和消耗全部以后端配置为准</span>
+        <span className="section-note">所有工具、模型、比例、分辨率、精度和点数消耗均以后端配置为准</span>
       </div>
-      {tools.length ? (
-        <div className="tool-grid">
-          {tools.map((tool) => (
-            <article className="tool-card" key={tool.toolKey}>
-              <div className="card-topline">
+      {featured.length ? (
+        <div className="tool-grid rh-tool-grid">
+          {featured.map((tool, index) => (
+            <article className={index === 0 ? "tool-card rh-tool-card hero-tool" : "tool-card rh-tool-card"} key={tool.toolKey}>
+              <div className="tool-card-visual" data-kind={tool.category === "video" ? "video" : "image"}>
                 <Icon name={tool.category === "video" ? "video" : "image"} />
-                <span>{tool.category || "未分类"}</span>
+                <span>{tool.category === "video" ? "AI Video" : "AI Image"}</span>
+              </div>
+              <div className="card-topline">
+                <span>{tool.category === "video" ? "视频" : "图像"}</span>
+                <span>{tool.cost || 0} 点/次</span>
               </div>
               <h3>{tool.name}</h3>
               <p>{tool.description || "该工具说明尚未在 Admin 配置。"}</p>
@@ -1884,6 +1895,234 @@ function ToolMatrix({ tools }: { tools: Tool[] }) {
       ) : (
         <EmptyBlock title="暂无公开工具" body="请先在 Admin 工具管理中启用工具，并配置模型、比例、分辨率、精度和点数。" />
       )}
+    </section>
+  );
+}
+
+function contentCoverUrl(item?: { coverUrl?: string } | null, fallback = "/home-bg-poster.jpg") {
+  return resolveConfigAssetUrl(item?.coverUrl || fallback);
+}
+
+function caseActionLabel(item: CaseContent) {
+  if (item.caseType === "workflow") return item.licenseMode === "closed_paid" ? "购买并运行" : "打开 Workflow";
+  if (item.caseType === "prompt") return "复制提示词";
+  return "同款创作";
+}
+
+function HomeChannelStrip({
+  tools,
+  cases,
+  galleryWorks,
+  onStart
+}: {
+  tools: Tool[];
+  cases: CaseContent[];
+  galleryWorks: Work[];
+  onStart: () => void;
+}) {
+  const poster = "/home-bg-poster.jpg";
+  const tiles = [
+    { title: cases[0]?.title || "产品主图到社媒海报", label: "一键同款", image: contentCoverUrl(cases[0], poster) },
+    { title: cases[1]?.title || "品牌活动短视频分镜", label: "Workflow 模板", image: contentCoverUrl(cases[1], poster) },
+    { title: galleryWorks[0]?.galleryTitle || galleryWorks[0]?.title || "公开作品精选", label: "作品广场", image: contentCoverUrl(galleryWorks[0], poster) },
+    { title: tools[0]?.name || "首个公开工具", label: "热门工具", image: poster }
+  ];
+  return (
+    <section className="rh-hot-strip" aria-label="热门模板">
+      <div className="hot-copy">
+        <span>无限画布</span>
+        <strong>热门模板</strong>
+        <button type="button" onClick={onStart}>进入工作台</button>
+      </div>
+      <div className="hot-card-row">
+        {tiles.map((tile, index) => (
+          <article className="hot-card" key={String(tile.title) + "-" + index}>
+            <img src={tile.image} alt={tile.title} loading="lazy" />
+            <span>{tile.label}</span>
+            <strong>{tile.title}</strong>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HomeCaseDeck({
+  cases,
+  authed,
+  onLogin,
+  onToast,
+  onOpenDashboard
+}: {
+  cases: CaseContent[];
+  authed: boolean;
+  onLogin: () => void;
+  onToast: (toast: Toast) => void;
+  onOpenDashboard?: (tab: string, path?: string) => void;
+}) {
+  const openCase = (item: CaseContent) => {
+    if (!authed && item.caseType === "workflow" && item.purchaseRequired) {
+      onToast({ title: "请先登录后再购买或运行闭源 Workflow", tone: "info" });
+      onLogin();
+      return;
+    }
+    if (item.caseType === "workflow") {
+      onOpenDashboard?.("cases", workflowCasePath(item.id));
+      return;
+    }
+    if (!authed) {
+      onToast({ title: "请先登录后再进行同款创作", tone: "info" });
+      onLogin();
+      return;
+    }
+    onOpenDashboard?.("create", item.toolKey ? "/dashboard/tool/" + encodeURIComponent(item.toolKey) : dashboardPathForTab("create"));
+  };
+
+  return (
+    <section id="cases" className="content-band rh-section case-deck-section">
+      <div className="section-title-row rh-title-row">
+        <div>
+          <span className="eyebrow">Templates</span>
+          <h2>案例与 Workflow 市场</h2>
+        </div>
+        <span className="section-note">提示词案例、作品案例、Workflow 案例统一进入 CaseContent 内容索引</span>
+      </div>
+      {cases.length ? (
+        <div className="case-deck-grid">
+          {cases.slice(0, 8).map((item, index) => (
+            <article className={index < 2 ? "case-deck-card featured" : "case-deck-card"} key={item.id}>
+              <img src={contentCoverUrl(item)} alt={item.title} loading="lazy" />
+              <div className="tile-shade" />
+              <div className="case-deck-body">
+                <div className="card-topline">
+                  <span>{caseContentTypeLabel(item)}</span>
+                  <span>{caseContentAccessLabel(item)}</span>
+                </div>
+                <h3>{item.title}</h3>
+                <p>{item.summary || "该案例摘要尚未配置。"}</p>
+                <div className="chip-row">
+                  {caseContentTags(item).map((tag) => <span key={tag}>{tag}</span>)}
+                </div>
+                <button type="button" onClick={() => openCase(item)}>{caseActionLabel(item)}</button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyBlock title="暂无公开案例" body="请在 Dashboard 或 Admin 发布提示词、作品或 Workflow 案例后再展示。" />
+      )}
+    </section>
+  );
+}
+
+function HomeGalleryPreview({
+  works,
+  authed,
+  onLogin,
+  onToast,
+  onOpenDashboard
+}: {
+  works: Work[];
+  authed: boolean;
+  onLogin: () => void;
+  onToast: (toast: Toast) => void;
+  onOpenDashboard?: (tab: string, path?: string) => void;
+}) {
+  const openWork = (work: Work) => {
+    if (!authed) {
+      onToast({ title: "请先登录后再下载、收藏或同款创作", tone: "info" });
+      onLogin();
+      return;
+    }
+    onOpenDashboard?.("works", "/dashboard/works/" + encodeURIComponent(work.id));
+  };
+
+  return (
+    <section id="showcase" className="content-band rh-section gallery-preview-section">
+      <div className="section-title-row rh-title-row">
+        <div>
+          <span className="eyebrow">Gallery</span>
+          <h2>公开作品广场</h2>
+        </div>
+        <span className="section-note">公开作品、完整提示词、下载与同款创作权限均以后端返回为准</span>
+      </div>
+      {works.length ? (
+        <div className="gallery-preview-grid">
+          {works.slice(0, 10).map((work, index) => {
+            const url = workPreviewUrl(work);
+            return (
+              <button type="button" className={index === 0 ? "gallery-preview-card featured" : "gallery-preview-card"} key={work.id} onClick={() => openWork(work)}>
+                {url ? (isVideoUrl(url) || work.contentType === "video" ? <video src={url} preload="metadata" /> : <img src={url} alt={workTitle(work)} loading="lazy" />) : <span className="case-cover-placeholder">暂无预览</span>}
+                <div className="tile-shade" />
+                <strong>{work.galleryTitle || work.title || "未命名作品"}</strong>
+                <span>{work.author?.nickname || "seeFactory 用户"} · {work.toolKey || "tool"}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="empty-gallery-wall">
+          <strong>作品广场正在等待第一批精选内容</strong>
+          <span>用户发布公开作品后，这里会形成类似 RunningHub 的瀑布流展示。</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function HomeModelStrip({ models }: { models: ModelCapability[] }) {
+  return (
+    <section id="models" className="content-band rh-section model-strip-section">
+      <div className="section-title-row rh-title-row">
+        <div>
+          <span className="eyebrow">Models</span>
+          <h2>面向用户的模型能力</h2>
+        </div>
+        <span className="section-note">Provider、上游模型和成本价只在 Admin 侧管理</span>
+      </div>
+      {models.length ? (
+        <div className="model-strip">
+          {models.slice(0, 18).map((model) => (
+            <article key={model.modelKey}>
+              <span>{model.modality || model.nodeType || "model"}</span>
+              <strong>{model.name}</strong>
+              <small>{model.pricePoints || 0} 点 · {model.status || "online"}</small>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyBlock title="暂无可用模型" body="用户端模型列表只能来自后端已上线的 ModelCapability。" />
+      )}
+    </section>
+  );
+}
+
+function HomePricingBlock({
+  rechargePolicy,
+  onStart
+}: {
+  rechargePolicy?: RechargePolicy | null;
+  onStart: () => void;
+}) {
+  const pointRate = Number(rechargePolicy?.pointRate || 7);
+  return (
+    <section id="pricing" className="content-band rh-section pricing-runway">
+      <article>
+        <span className="eyebrow">Wallet</span>
+        <h2>PC Dashboard 采用 Crypto 充值</h2>
+        <p>移动端按平台接入支付，PC H5 复用现有 Crypto bridge / wallet / payment 体系。</p>
+      </article>
+      <article>
+        <span className="eyebrow">Points</span>
+        <h2>1 CNY = {formatPoints(pointRate)} 点</h2>
+        <p>支持自填金额充值；生成、Workflow 运行和闭源模板购买均按后端配置扣点。</p>
+      </article>
+      <article>
+        <span className="eyebrow">Workflow</span>
+        <h2>预估冻结 + 实际结算</h2>
+        <p>失败释放未消耗部分，购买闭源模板后永久获得该发布版本运行权。</p>
+      </article>
+      <button type="button" onClick={onStart}>打开钱包与工作台</button>
     </section>
   );
 }
@@ -1903,9 +2142,9 @@ function caseContentAccessLabel(item: CaseContent) {
 }
 
 function caseContentMetricLabel(item: CaseContent) {
-  if (item.caseType === "workflow") return `${formatPoints(item.pricePoints || 0)} 点`;
-  if (item.caseType === "prompt") return `${formatPoints(item.runCount || 0)} 次使用`;
-  return `${formatPoints(item.runCount || 0)} 次浏览`;
+  if (item.caseType === "workflow") return formatPoints(item.pricePoints || 0) + " 点";
+  if (item.caseType === "prompt") return formatPoints(item.runCount || 0) + " 次使用";
+  return formatPoints(item.runCount || 0) + " 次浏览";
 }
 
 function caseContentTags(item: CaseContent) {
@@ -2608,8 +2847,8 @@ function GalleryPanel({
 
 function ModelTable({ models }: { models: ModelCapability[] }) {
   return (
-    <section id="models" className="content-band">
-      <div className="section-title-row">
+    <section id="models" className="content-band model-table-section">
+      <div className="section-title-row rh-title-row">
         <div>
           <span className="eyebrow">Models</span>
           <h2>面向用户的模型能力</h2>
@@ -2665,16 +2904,16 @@ function SupportPanel({
   const copyValue = (label: string, value?: string) => {
     const text = String(value || "").trim();
     if (!text) {
-      onToast({ title: `${label} 暂未配置`, tone: "danger" });
+      onToast({ title: label + " 暂未配置", tone: "danger" });
       return;
     }
     navigator.clipboard?.writeText(text).catch(() => undefined);
-    onToast({ title: `${label} 已复制`, tone: "success" });
+    onToast({ title: label + " 已复制", tone: "success" });
   };
 
   return (
     <section id="help" className={compact ? "content-band support-panel compact" : "workspace-section support-panel"}>
-      <div className="section-title-row">
+      <div className="section-title-row rh-title-row">
         <div>
           <span className="eyebrow">Help center</span>
           <h2>帮助与客服</h2>
@@ -2703,7 +2942,7 @@ function SupportPanel({
           <Icon name="mail" />
           <span>邮箱</span>
           <strong>{email}</strong>
-          <button onClick={() => openExternalUrl(`mailto:${email}`)}>发送邮件</button>
+          <button onClick={() => openExternalUrl("mailto:" + email)}>发送邮件</button>
         </article>
         {customerService?.qrCodeUrl ? (
           <article className="support-card qr-card">
@@ -2851,7 +3090,7 @@ function PricingHelp({
 
   return (
     <>
-      <section id="pricing" className="content-band pricing-grid">
+      <section id="pricing" className="content-band pricing-grid pricing-runway">
         <article>
           <span className="eyebrow">Wallet</span>
           <h2>PC Dashboard 只接 Crypto</h2>
@@ -2904,35 +3143,28 @@ function PublicHome({
     }, 0);
   }, [data.loading, publicSection]);
 
+  useEffect(() => {
+    if (!authed || !pendingAction) return;
+    onActionConsumed?.();
+    if (pendingAction.type.includes("gallery") && pendingAction.workId) {
+      onOpenDashboard?.("works", "/dashboard/works/" + encodeURIComponent(pendingAction.workId));
+    } else if (pendingAction.type.includes("case") && pendingAction.caseId) {
+      onOpenDashboard?.("cases", workflowCasePath(pendingAction.caseId));
+    }
+  }, [authed, pendingAction]);
+
   return (
     <>
       <Hero appConfig={data.appConfig} tools={data.tools} onStart={onStart} onShowcase={scrollToShowcase} />
       {data.loading ? <LoadingBlock title="正在同步公开配置" /> : null}
       {data.error ? <EmptyBlock title="部分公开配置加载失败" body={data.error} /> : null}
+      <HomeChannelStrip tools={data.tools} cases={data.cases} galleryWorks={data.galleryWorks} onStart={onStart} />
       <ToolMatrix tools={data.tools} />
-      <CaseSquare
-        cases={data.cases}
-        authed={authed}
-        onLogin={onLogin}
-        onToast={onToast}
-        pendingAction={pendingAction}
-        onRequireAuthAction={onRequireAuthAction}
-        onActionConsumed={onActionConsumed}
-        onOpenDashboard={onOpenDashboard}
-      />
-      <GalleryPanel
-        tools={data.tools}
-        initialWorks={data.galleryWorks}
-        authed={authed}
-        onLogin={onLogin}
-        onToast={onToast}
-        pendingAction={pendingAction}
-        onRequireAuthAction={onRequireAuthAction}
-        onActionConsumed={onActionConsumed}
-        compact
-      />
-      <ModelTable models={data.models} />
-      <PricingHelp customerService={data.customerService} faqs={data.faqs} rechargePolicy={data.rechargePolicy} onToast={onToast} />
+      <HomeCaseDeck cases={data.cases} authed={authed} onLogin={onLogin} onToast={onToast} onOpenDashboard={onOpenDashboard} />
+      <HomeGalleryPreview works={data.galleryWorks} authed={authed} onLogin={onLogin} onToast={onToast} onOpenDashboard={onOpenDashboard} />
+      <HomeModelStrip models={data.models} />
+      <HomePricingBlock rechargePolicy={data.rechargePolicy} onStart={onStart} />
+      <SupportPanel customerService={data.customerService} faqs={data.faqs} onToast={onToast} compact />
     </>
   );
 }
@@ -2974,7 +3206,7 @@ function DashboardShell({
     ["works", "我的作品", "gallery"],
     ["showcase", "公开广场", "gallery"],
     ["workflow", "Workflow", "nodes"],
-    ["cases", "案例广场", "gallery"],
+    ["cases", "案例市场", "gallery"],
     ["purchases", "已购模板", "badge"],
     ["income", "创作者收益", "wallet"],
     ["runs", "运行记录", "list"],
@@ -2987,8 +3219,8 @@ function DashboardShell({
   const title = nav.find(([key]) => key === active)?.[1] || "工作台";
 
   return (
-    <div className="dashboard-shell">
-      <aside className="sidebar">
+    <div className="dashboard-shell rh-dashboard-shell">
+      <aside className="sidebar rh-sidebar">
         <Logo appConfig={appConfig} />
         <div className="side-nav">
           {nav.map(([key, label, icon]) => (
@@ -3000,13 +3232,13 @@ function DashboardShell({
         </div>
         <Button variant="ghost" onClick={onLogout}>
           <Icon name="logout" />
-          退出
+          退出登录
         </Button>
       </aside>
-      <main className="workspace">
-        <header className="workspace-head">
+      <main className="workspace rh-workspace">
+        <header className="workspace-head rh-workspace-head">
           <div>
-            <span className="eyebrow">Logged-in workspace</span>
+            <span className="eyebrow">Creator workspace</span>
             <h1>{title}</h1>
           </div>
           <Button variant="primary" onClick={() => onToast({ title: "已创建空白 Workflow 草稿", tone: "success" })}>
@@ -3045,14 +3277,14 @@ function Overview({
   components: ComponentDefinition[];
 }) {
   return (
-    <div className="workspace-grid">
+    <div className="workspace-grid overview-grid">
       <div className="metric-card">
         <span>可用工具</span>
         <strong>{tools.length}</strong>
       </div>
       <div className="metric-card">
         <span>公开 Workflow</span>
-        <strong>{cases.length}</strong>
+        <strong>{cases.filter((item) => item.caseType === "workflow").length}</strong>
       </div>
       <div className="metric-card">
         <span>在线模型</span>
@@ -3062,9 +3294,10 @@ function Overview({
         <span>Workflow 组件</span>
         <strong>{components.length}</strong>
       </div>
-      <div className="wide-panel">
-        <h2>最近创作</h2>
-        <EmptyBlock title="暂无作品" body="生成完成后，作品会进入作品库，并可手动发布到广场。" />
+      <div className="wide-panel spotlight-panel">
+        <span className="eyebrow">Next</span>
+        <h2>从工具到 Workflow 的一体化创作台</h2>
+        <p>选择工具生成作品，沉淀为案例，再把可复用步骤编排成模板发布到市场。</p>
       </div>
     </div>
   );
