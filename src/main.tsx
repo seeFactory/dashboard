@@ -159,6 +159,9 @@ type WorkflowPurchaseStatus = {
   hasReplacementModel?: boolean;
   replacementAvailable?: boolean;
   visibility?: string;
+  listingStatus?: string;
+  public?: boolean;
+  deletedByAuthorAt?: string;
   trialEnabled?: boolean;
   trialLimitPerUser?: number;
   trialUsed?: number;
@@ -260,6 +263,10 @@ type WorkflowPurchase = {
   disabledReason?: string;
   hasReplacementModel?: boolean;
   replacementAvailable?: boolean;
+  visibility?: string;
+  listingStatus?: string;
+  public?: boolean;
+  deletedByAuthorAt?: string;
   purchasedAt?: string;
   case?: CaseContent;
   version?: {
@@ -1102,7 +1109,15 @@ function workflowBlockedReason(item?: { runBlockedReason?: string; disabledReaso
   return item?.runBlockedReason || item?.disabledReason || "";
 }
 
-function workflowCaseLifecycle(caseContent?: CaseContent | null) {
+type WorkflowLifecycleFields = {
+  disabled?: boolean;
+  visibility?: string;
+  listingStatus?: string;
+  public?: boolean;
+  deletedByAuthorAt?: string;
+};
+
+function workflowCaseLifecycle(caseContent?: WorkflowLifecycleFields | null) {
   if (!caseContent) return { label: "--", tone: "idle" };
   if (caseContent.disabled || caseContent.visibility === "disabled" || caseContent.listingStatus === "disabled") {
     return { label: "已禁用", tone: "danger" };
@@ -1112,6 +1127,28 @@ function workflowCaseLifecycle(caseContent?: CaseContent | null) {
     return { label: "已隐藏", tone: "hidden" };
   }
   return { label: "公开中", tone: "listed" };
+}
+
+function workflowLifecycleNote(source?: WorkflowLifecycleFields | null, purchased = false) {
+  if (!source) return "";
+  if (source.disabled || source.visibility === "disabled" || source.listingStatus === "disabled") {
+    return "该模板已被平台暂停运行，购买记录仍保留，待平台恢复或提供替代模型后再运行。";
+  }
+  if (source.deletedByAuthorAt) {
+    return purchased
+      ? "作者已停止公开展示该案例，已购权益仍保留，可继续运行该发布版本。"
+      : "作者已停止公开展示该案例，暂不支持新的购买或公开访问。";
+  }
+  if (source.public === false || source.visibility === "hidden" || source.listingStatus === "hidden") {
+    return purchased
+      ? "作者已隐藏公开展示，已购权益仍保留，可继续运行该发布版本。"
+      : "该案例当前已隐藏，暂不支持新的购买或公开访问。";
+  }
+  return "";
+}
+
+function workflowPurchaseLifecycleSource(item?: WorkflowPurchase | null): WorkflowLifecycleFields | null {
+  return item?.case || item || null;
 }
 
 function formatCnyFromCents(value?: number) {
@@ -5092,6 +5129,8 @@ function WorkflowCasePanel({
   const canRun = workflowCanRun(status || selectedCase);
   const canTrial = selectedCase?.licenseMode === "closed_paid" && Boolean(status?.trialEnabled) && Number(status?.trialRemaining || 0) > 0 && !status?.purchased;
   const uploadBusy = isWorkflowUploadBusy(runUploadState);
+  const selectedLifecycle = workflowCaseLifecycle(status || selectedCase);
+  const selectedLifecycleNote = workflowLifecycleNote(status || selectedCase, Boolean(status?.purchased));
 
   if (loading) return <LoadingBlock title="正在同步 Workflow 案例广场" />;
   if (error) {
@@ -5136,6 +5175,7 @@ function WorkflowCasePanel({
             <div className="mini-meta">
               <span>{selectedCase.pricePoints || 0} 点</span>
               <span>{status?.purchased ? "已购买" : selectedCase.purchaseRequired ? "需购买" : "免费运行"}</span>
+              <span className={`lifecycle ${selectedLifecycle.tone}`}>{selectedLifecycle.label}</span>
               <span>试运行 {status?.trialRemaining ?? selectedCase.trialRemaining ?? 0} 次</span>
               <span>购买 {selectedCase.purchaseCount || 0}</span>
               <span>克隆 {selectedCase.cloneCount || 0}</span>
@@ -5156,6 +5196,7 @@ function WorkflowCasePanel({
                       : "购买后获得该发布版本的永久运行权；后续运行仍按模型节点扣点，不会开放 graph、克隆或 .seeflow 导出。"
                     : "开源免费案例允许登录后运行、克隆为私有草稿，并导出公开 .seeflow。"}
                 </p>
+                {selectedLifecycleNote ? <p className="workflow-lifecycle-note">{selectedLifecycleNote}</p> : null}
               </div>
               {selectedCase.licenseMode === "closed_paid" && status?.purchased ? (
                 <Button variant="ghost" onClick={onOpenPurchases}>
@@ -5306,6 +5347,9 @@ function PurchasedTemplates({ onToast }: { onToast: (toast: Toast) => void }) {
         const values = runValuesById[item.id] || initialWorkflowRunValues(runForm);
         const uploadState = runUploadStateById[item.id] || {};
         const uploadBusy = isWorkflowUploadBusy(uploadState);
+        const lifecycleSource = workflowPurchaseLifecycleSource(item);
+        const lifecycle = workflowCaseLifecycle(lifecycleSource);
+        const lifecycleNote = workflowLifecycleNote(lifecycleSource, true);
         return (
           <article className="tool-card" key={item.id}>
             <div className="card-topline">
@@ -5317,7 +5361,10 @@ function PurchasedTemplates({ onToast }: { onToast: (toast: Toast) => void }) {
             <div className="mini-meta">
               <span>{item.pricePoints || 0} 点</span>
               <span>{item.purchasedAt ? formatDate(item.purchasedAt) : "永久权益"}</span>
+              <span className={`lifecycle ${lifecycle.tone}`}>{lifecycle.label}</span>
             </div>
+            {lifecycleNote ? <p className="workflow-lifecycle-note">{lifecycleNote}</p> : null}
+            {!workflowCanRun(item) && workflowBlockedReason(item) ? <p className="danger-text">{workflowBlockedReason(item)}</p> : null}
             <WorkflowRunFormFields
               runForm={runForm}
               values={values}
