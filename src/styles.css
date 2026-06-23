@@ -307,6 +307,7 @@ code {
 .hero-section .studio-preview {
   position: relative;
   z-index: 1;
+  min-width: 0;
 }
 
 .hero-section .studio-preview {
@@ -320,6 +321,7 @@ code {
   font-size: clamp(2.4rem, 5vw, 5.8rem);
   line-height: 0.96;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .hero-copy p {
@@ -328,6 +330,7 @@ code {
   color: var(--muted);
   font-size: 1.08rem;
   line-height: 1.8;
+  overflow-wrap: anywhere;
 }
 
 .eyebrow {
@@ -2965,7 +2968,9 @@ code {
   }
 
   .hero-copy h1 {
-    font-size: 2.4rem;
+    max-width: 100%;
+    font-size: 2rem;
+    line-height: 1.08;
   }
 
   .workflow-board,
