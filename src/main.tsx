@@ -4571,6 +4571,21 @@ function WorkflowConsole({
     updateNode(activeNode.nodeKey, { upstreamNodeKeys });
   };
 
+  const autoLinkLinear = () => {
+    setSelectedNodes((current) => current.map((node, index) => ({
+      ...node,
+      upstreamNodeKeys: index > 0 ? [current[index - 1].nodeKey] : []
+    })));
+    setValidation(null);
+    onToast({ title: "已按当前顺序整理为线性链路", tone: "success" });
+  };
+
+  const clearWorkflowLinks = () => {
+    setSelectedNodes((current) => current.map((node) => ({ ...node, upstreamNodeKeys: [] })));
+    setValidation(null);
+    onToast({ title: "已清空节点连接，可重新选择上游输入", tone: "info" });
+  };
+
   const handleCanvasDragOver = (event: React.DragEvent<HTMLDivElement>) => {
     if (!dragComponentKey) return;
     event.preventDefault();
@@ -4839,6 +4854,15 @@ function WorkflowConsole({
     }
   };
 
+  const runFormPreview = buildWorkflowRunForm(selectedNodes);
+  const exposedRunFields = Array.isArray(runFormPreview.fields) ? runFormPreview.fields : [];
+  const toolBoundCount = selectedNodes.filter((node) => {
+    const tool = node.toolKey ? tools.find((item) => item.toolKey === node.toolKey) : resolveToolForComponent(node.component, tools);
+    return Boolean(tool?.toolKey);
+  }).length;
+  const modelBoundCount = selectedNodes.filter((node) => String(node.modelKey || node.component.modelKey || "").trim()).length;
+  const uploadFieldCount = selectedNodes.filter((node) => node.exposeUpload).length;
+
   return (
     <div className="workflow-console">
       <div className="component-column">
@@ -4969,6 +4993,14 @@ function WorkflowConsole({
             <Icon name="download" />
             导出当前草稿
           </Button>
+          <Button variant="ghost" onClick={autoLinkLinear} disabled={Boolean(busy) || selectedNodes.length < 2}>
+            <Icon name="nodes" />
+            线性串联
+          </Button>
+          <Button variant="ghost" onClick={clearWorkflowLinks} disabled={Boolean(busy) || !visualEdges.length}>
+            <Icon name="x" />
+            清空连接
+          </Button>
         </div>
 
         <div className="workflow-form">
@@ -5019,6 +5051,43 @@ function WorkflowConsole({
               </label>
             </>
           ) : null}
+        </div>
+
+        <div className="workflow-publish-summary">
+          <article>
+            <span>发布模式</span>
+            <strong>{mode === "closed_paid" ? "闭源付费" : "开源免费"}</strong>
+            <small>{mode === "closed_paid" ? `售价 ${pricePoints} 点，购买后只开放运行权` : "公开 graph，允许克隆和导出 .seeflow"}</small>
+          </article>
+          <article>
+            <span>节点完整度</span>
+            <strong>{toolBoundCount}/{selectedNodes.length || 0} 工具 · {modelBoundCount}/{selectedNodes.length || 0} 模型</strong>
+            <small>{selectedNodes.length ? "缺模型时会依赖工具默认模型或服务端校验" : "请先从组件库添加节点"}</small>
+          </article>
+          <article>
+            <span>运行表单</span>
+            <strong>{exposedRunFields.length} 个字段</strong>
+            <small>{uploadFieldCount ? `包含 ${uploadFieldCount} 个素材输入节点` : "当前没有开放素材上传字段"}</small>
+          </article>
+        </div>
+
+        <div className="workflow-runform-preview">
+          <div>
+            <span className="eyebrow">Run form preview</span>
+            <strong>运行者将看到的参数</strong>
+          </div>
+          {exposedRunFields.length ? (
+            <div className="runform-chip-list">
+              {exposedRunFields.map((field) => (
+                <span key={String(field.key)}>
+                  {String(field.label || field.key)}
+                  {field.required ? <small>必填</small> : null}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p>当前没有开放运行参数；如果要发布为可复用案例，建议至少开放提示词字段。</p>
+          )}
         </div>
 
         <div

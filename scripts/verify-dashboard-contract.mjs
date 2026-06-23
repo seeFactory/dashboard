@@ -104,7 +104,7 @@ for (const pattern of [
   'apiGet<Tool[]>("/tools")',
   'apiGet<PageData<CaseContent>>("/case-contents?pageSize=12")',
   'apiGet<PageData<Work>>("/gallery/works?pageSize=12")',
-  'apiGet<PageData<ModelCapability>>("/models?pageSize=12")',
+  'apiGet<PageData<ModelCapability>>("/models?pageSize=100")',
   'apiGet<PageData<ComponentDefinition>>("/components?pageSize=100&clientRuntime=h5-google")',
   'apiGet<CustomerServiceConfig>("/customer-service")',
   'apiGet<{ list: FaqItem[] }>("/faqs")',
