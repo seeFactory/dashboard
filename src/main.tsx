@@ -865,8 +865,8 @@ function usePublicData() {
           caseResult.ok ? "" : "案例配置：" + (caseResult.reason?.message || "加载失败"),
           galleryResult.ok ? "" : "作品广场：" + (galleryResult.reason?.message || "加载失败"),
           modelResult.ok ? "" : "模型能力：" + (modelResult.reason?.message || "加载失败"),
-          componentResult.ok ? "" : "组件定义：" + (componentResult.reason?.message || "加载失败"),
-          customerResult.ok ? "" : "客服配置：" + (customerResult.reason?.message || "加载失败"),
+          componentResult.ok ? "" : "Workflow 组件：" + (componentResult.reason?.message || "加载失败"),
+          customerResult.ok ? "" : "客服信息：" + (customerResult.reason?.message || "加载失败"),
           faqResult.ok ? "" : "FAQ：" + (faqResult.reason?.message || "加载失败"),
           rechargeResult.ok ? "" : "充值配置：" + (rechargeResult.reason?.message || "加载失败")
         ].filter(Boolean);
@@ -1210,7 +1210,17 @@ function paymentStatusLabel(status?: string) {
     closed: "已关闭",
     failed: "失败",
     expired: "已过期",
-    canceled: "已取消"
+    canceled: "已取消",
+    online: "可用",
+    available: "可用",
+    enabled: "已启用",
+    active: "可用",
+    offline: "不可用",
+    disabled: "已停用",
+    draft: "草稿",
+    published: "已发布",
+    hidden: "已隐藏",
+    archived: "已归档"
   };
   return labels[String(status || "").toLowerCase()] || status || "--";
 }
@@ -1674,7 +1684,7 @@ function AuthModal({
                 {!googleReady ? <small>正在加载 Google 登录</small> : null}
               </>
             ) : (
-              <small>需要配置 VITE_SEEFACTORY_GOOGLE_CLIENT_ID</small>
+              <small>Google 登录暂未开放</small>
             )}
           </div>
           <button disabled={pendingProvider === "X"} onClick={handleXLogin}>
@@ -1689,13 +1699,13 @@ function AuthModal({
             {TELEGRAM_BOT_USERNAME ? (
               <div ref={telegramHostRef} className="telegram-widget-host" />
             ) : (
-              <small>需要配置 VITE_SEEFACTORY_TELEGRAM_BOT_USERNAME</small>
+              <small>Telegram 登录暂未开放</small>
             )}
           </div>
         </div>
         {pendingProvider ? <p className="muted-text">正在完成 {pendingProvider} 登录，请稍候。</p> : null}
         <p className="muted-text">
-          Telegram Web 登录会走后端 <code>/auth/h5/telegram-login</code> 验签，并和 TMA 身份统一绑定。
+          Telegram 登录可与 Telegram 小程序中的账号保持一致。
         </p>
       </div>
     </div>
@@ -1719,7 +1729,7 @@ function PublicShell({
     <div className="site-shell runninghub-shell">
       <div className="launch-strip">
         <span>Workflow 画布与模板市场已开放</span>
-        <strong>模型、工具、案例统一由后端配置驱动</strong>
+        <strong>工具、模板与作品广场会持续更新</strong>
         <button type="button" onClick={onOpenDashboard}>立即创作</button>
       </div>
       <header className="topbar rh-topbar">
@@ -1806,9 +1816,9 @@ function Hero({
         <img src={posterUrl} alt="seeFactory 创作视觉" />
         <div className="tile-shade" />
         <div className="tile-copy bottom-left">
-          <span>AI Image Factory</span>
+          <span>AI 图像工厂</span>
           <strong>{imageTool?.name || "AI 图像工厂"}</strong>
-          <small>比例、分辨率、模型选择全部由 Admin 配置</small>
+          <small>选择比例、清晰度与模型，快速生成可下载作品</small>
         </div>
       </div>
 
@@ -1816,9 +1826,9 @@ function Hero({
         {videoUrl ? <video src={videoUrl} poster={posterUrl} autoPlay muted loop playsInline preload="metadata" /> : <img src={posterUrl} alt="seeFactory Workflow" />}
         <div className="tile-shade heavy" />
         <div className="tile-copy center-stage">
-          <span>{home?.eyebrow?.trim() || "seeFactory Dashboard"}</span>
+          <span>{home?.eyebrow?.trim() || "seeFactory 工作台"}</span>
           <h1>{home?.headline?.trim() || "AI 内容工厂"}</h1>
-          <p>{home?.subtitle?.trim() || "对标内容创作平台的 PC 工作台：未登录可浏览工具、案例、模型和广场；登录后完成生成、下载、收藏、购买与 Workflow 编排。"}</p>
+          <p>{home?.subtitle?.trim() || "在桌面端浏览工具、案例、模型和作品广场；登录后即可生成、下载、收藏、购买模板并编排 Workflow。"}</p>
           <div className="hero-actions">
             <Button onClick={onStart}>
               <Icon name="play" />
@@ -1842,7 +1852,7 @@ function Hero({
           </div>
         </div>
         <div className="invite-card">
-          <span>AI Video</span>
+          <span>AI 视频</span>
           <strong>{videoTool?.name || "视频工作流生成"}</strong>
           <button type="button" onClick={onStart}>进入工作台</button>
         </div>
@@ -1865,10 +1875,10 @@ function ToolMatrix({ tools }: { tools: Tool[] }) {
     <section id="tools" className="content-band rh-section tool-section">
       <div className="section-title-row rh-title-row">
         <div>
-          <span className="eyebrow">Explore</span>
+          <span className="eyebrow">工具</span>
           <h2>探索 seeFactory 工具</h2>
         </div>
-        <span className="section-note">所有工具、模型、比例、分辨率、精度和点数消耗均以后端配置为准</span>
+        <span className="section-note">选择图像、视频和 Workflow 工具，登录后按页面参数完成生成。</span>
       </div>
       {featured.length ? (
         <div className="tool-grid rh-tool-grid">
@@ -1876,14 +1886,14 @@ function ToolMatrix({ tools }: { tools: Tool[] }) {
             <article className={index === 0 ? "tool-card rh-tool-card hero-tool" : "tool-card rh-tool-card"} key={tool.toolKey}>
               <div className="tool-card-visual" data-kind={tool.category === "video" ? "video" : "image"}>
                 <Icon name={tool.category === "video" ? "video" : "image"} />
-                <span>{tool.category === "video" ? "AI Video" : "AI Image"}</span>
+                <span>{tool.category === "video" ? "AI 视频" : "AI 图像"}</span>
               </div>
               <div className="card-topline">
                 <span>{tool.category === "video" ? "视频" : "图像"}</span>
                 <span>{tool.cost || 0} 点/次</span>
               </div>
               <h3>{tool.name}</h3>
-              <p>{tool.description || "该工具说明尚未在 Admin 配置。"}</p>
+              <p>{tool.description || "该工具正在补充说明，仍可进入工作台查看可用参数。"}</p>
               <div className="chip-row">
                 {(tool.fields || []).slice(0, 5).map((field) => (
                   <span key={field}>{field}</span>
@@ -1893,7 +1903,7 @@ function ToolMatrix({ tools }: { tools: Tool[] }) {
           ))}
         </div>
       ) : (
-        <EmptyBlock title="暂无公开工具" body="请先在 Admin 工具管理中启用工具，并配置模型、比例、分辨率、精度和点数。" />
+        <EmptyBlock title="暂无公开工具" body="工具库正在整理中，请稍后再来查看。" />
       )}
     </section>
   );
@@ -1982,10 +1992,10 @@ function HomeCaseDeck({
     <section id="cases" className="content-band rh-section case-deck-section">
       <div className="section-title-row rh-title-row">
         <div>
-          <span className="eyebrow">Templates</span>
+          <span className="eyebrow">模板</span>
           <h2>案例与 Workflow 市场</h2>
         </div>
-        <span className="section-note">提示词案例、作品案例、Workflow 案例统一进入 CaseContent 内容索引</span>
+        <span className="section-note">从提示词、作品和 Workflow 模板中挑选灵感，登录后可收藏、购买或直接运行。</span>
       </div>
       {cases.length ? (
         <div className="case-deck-grid">
@@ -2009,7 +2019,7 @@ function HomeCaseDeck({
           ))}
         </div>
       ) : (
-        <EmptyBlock title="暂无公开案例" body="请在 Dashboard 或 Admin 发布提示词、作品或 Workflow 案例后再展示。" />
+        <EmptyBlock title="暂无公开案例" body="模板市场正在整理中，稍后会展示更多可复用案例。" />
       )}
     </section>
   );
@@ -2041,10 +2051,10 @@ function HomeGalleryPreview({
     <section id="showcase" className="content-band rh-section gallery-preview-section">
       <div className="section-title-row rh-title-row">
         <div>
-          <span className="eyebrow">Gallery</span>
+          <span className="eyebrow">广场</span>
           <h2>公开作品广场</h2>
         </div>
-        <span className="section-note">公开作品、完整提示词、下载与同款创作权限均以后端返回为准</span>
+        <span className="section-note">打开作品可查看提示词与参数；下载、收藏和同款创作需要登录。</span>
       </div>
       {works.length ? (
         <div className="gallery-preview-grid">
@@ -2063,7 +2073,7 @@ function HomeGalleryPreview({
       ) : (
         <div className="empty-gallery-wall">
           <strong>作品广场正在等待第一批精选内容</strong>
-          <span>用户发布公开作品后，这里会形成类似 RunningHub 的瀑布流展示。</span>
+          <span>这里会汇集用户公开发布的图像与视频作品。</span>
         </div>
       )}
     </section>
@@ -2075,23 +2085,23 @@ function HomeModelStrip({ models }: { models: ModelCapability[] }) {
     <section id="models" className="content-band rh-section model-strip-section">
       <div className="section-title-row rh-title-row">
         <div>
-          <span className="eyebrow">Models</span>
-          <h2>面向用户的模型能力</h2>
+          <span className="eyebrow">模型</span>
+          <h2>可用模型能力</h2>
         </div>
-        <span className="section-note">Provider、上游模型和成本价只在 Admin 侧管理</span>
+        <span className="section-note">查看可用于创作的图像、视频和工作流模型能力。</span>
       </div>
       {models.length ? (
         <div className="model-strip">
           {models.slice(0, 18).map((model) => (
             <article key={model.modelKey}>
-              <span>{model.modality || model.nodeType || "model"}</span>
+              <span>{model.modality || model.nodeType || "模型"}</span>
               <strong>{model.name}</strong>
-              <small>{model.pricePoints || 0} 点 · {model.status || "online"}</small>
+              <small>{model.pricePoints || 0} 点 · {paymentStatusLabel(model.status || "online")}</small>
             </article>
           ))}
         </div>
       ) : (
-        <EmptyBlock title="暂无可用模型" body="用户端模型列表只能来自后端已上线的 ModelCapability。" />
+        <EmptyBlock title="暂无可用模型" body="模型能力正在整理中，请稍后再查看。" />
       )}
     </section>
   );
@@ -2109,13 +2119,13 @@ function HomePricingBlock({
     <section id="pricing" className="content-band rh-section pricing-runway">
       <article>
         <span className="eyebrow">Wallet</span>
-        <h2>PC Dashboard 采用 Crypto 充值</h2>
-        <p>移动端按平台接入支付，PC H5 复用现有 Crypto bridge / wallet / payment 体系。</p>
+        <h2>桌面端采用 Crypto 充值</h2>
+        <p>移动端按所在平台支付，桌面端通过 Crypto 充值点数。</p>
       </article>
       <article>
-        <span className="eyebrow">Points</span>
+        <span className="eyebrow">点数</span>
         <h2>1 CNY = {formatPoints(pointRate)} 点</h2>
-        <p>支持自填金额充值；生成、Workflow 运行和闭源模板购买均按后端配置扣点。</p>
+        <p>支持自填金额充值；每次生成或运行前都会展示预估点数，确认后再扣除。</p>
       </article>
       <article>
         <span className="eyebrow">Workflow</span>
@@ -2369,10 +2379,10 @@ function CaseSquare({
     <section id="cases" className="content-band">
       <div className="section-title-row">
         <div>
-          <span className="eyebrow">CaseContent</span>
+          <span className="eyebrow">Cases</span>
           <h2>公开案例广场</h2>
         </div>
-        <span className="section-note">提示词、公开作品和 Workflow 统一展示；收藏、下载、同款创作和运行权限均以后端配置为准</span>
+        <span className="section-note">浏览提示词、作品和 Workflow 模板；登录后可收藏、下载、同款创作或运行。</span>
       </div>
       <div className="gallery-filter-row case-type-filter">
         {[
@@ -2475,7 +2485,7 @@ function CaseSquare({
           </article>
         </div>
       ) : (
-        <EmptyBlock title="暂无公开案例" body="请在 Dashboard 或 Admin 发布提示词、作品或 Workflow 案例后再展示。" />
+        <EmptyBlock title="暂无公开案例" body="模板市场正在整理中，稍后会展示更多可复用案例。" />
       )}
     </section>
   );
@@ -2486,10 +2496,10 @@ function StaticCaseSquare({ cases }: { cases: CaseContent[] }) {
     <section id="cases" className="content-band">
       <div className="section-title-row">
         <div>
-          <span className="eyebrow">CaseContent</span>
+          <span className="eyebrow">Cases</span>
           <h2>公开案例广场</h2>
         </div>
-        <span className="section-note">提示词、公开作品与 Workflow 统一展示，权限由后端配置驱动</span>
+        <span className="section-note">提示词、作品和 Workflow 模板会统一展示在这里。</span>
       </div>
       {cases.length ? (
         <div className="case-layout">
@@ -2520,7 +2530,7 @@ function StaticCaseSquare({ cases }: { cases: CaseContent[] }) {
           ))}
         </div>
       ) : (
-        <EmptyBlock title="暂无公开案例" body="请在 Dashboard 或 Admin 发布提示词、作品或 Workflow 案例后再展示。" />
+        <EmptyBlock title="暂无公开案例" body="模板市场正在整理中，稍后会展示更多可复用案例。" />
       )}
     </section>
   );
@@ -2718,10 +2728,10 @@ function GalleryPanel({
     <section id="showcase" className={compact ? "content-band public-gallery compact" : "workspace-section public-gallery"}>
       <div className="section-title-row">
         <div>
-          <span className="eyebrow">Public Gallery</span>
+          <span className="eyebrow">作品广场</span>
           <h2>作品广场</h2>
         </div>
-        <span className="section-note">公开作品、完整提示词、同款创作和下载权限均以后端返回为准</span>
+        <span className="section-note">登录后可下载、收藏或基于公开作品进行同款创作。</span>
       </div>
 
       <div className="gallery-filter-row">
@@ -2765,7 +2775,7 @@ function GalleryPanel({
                   </div>
                   <div className="gallery-tile-body">
                     <strong>{workTitle(work)}</strong>
-                    <small>{work.author?.nickname || "seeFactory 用户"} · {work.toolKey || "tool"}</small>
+                    <small>{work.author?.nickname || "seeFactory 用户"} · {work.toolKey || "创作工具"}</small>
                     <span>{Number(work.viewCount || 0)} 浏览 · {Number(work.likeCount || 0)} 喜欢</span>
                   </div>
                 </button>
@@ -2796,8 +2806,8 @@ function GalleryPanel({
                 </div>
               ) : null}
               <div className="mini-meta">
-                <span>{selectedWork.toolKey || "tool"}</span>
-                <span>{selectedWork.modeKey || "default"}</span>
+                <span>{selectedWork.toolKey || "创作工具"}</span>
+                <span>{selectedWork.modeKey || "默认模式"}</span>
                 <span>{formatDate(selectedWork.galleryPublishedAt || selectedWork.createdAt)}</span>
                 <span>{Number(selectedWork.likeCount || 0)} 收藏</span>
                 <span>{selectedWork.downloadEnabled === false ? "不可下载" : "允许下载"}</span>
@@ -2850,10 +2860,10 @@ function ModelTable({ models }: { models: ModelCapability[] }) {
     <section id="models" className="content-band model-table-section">
       <div className="section-title-row rh-title-row">
         <div>
-          <span className="eyebrow">Models</span>
-          <h2>面向用户的模型能力</h2>
+          <span className="eyebrow">模型</span>
+          <h2>可用模型能力</h2>
         </div>
-        <span className="section-note">Provider 与上游模型只在 Admin 侧管理</span>
+        <span className="section-note">根据类型和用途筛选可用模型，了解点数消耗与能力范围。</span>
       </div>
       {models.length ? (
         <div className="model-table">
@@ -2873,7 +2883,7 @@ function ModelTable({ models }: { models: ModelCapability[] }) {
           ))}
         </div>
       ) : (
-        <EmptyBlock title="暂无可用模型" body="用户端模型列表只能来自后端已上线的 ModelCapability。" />
+        <EmptyBlock title="暂无可用模型" body="模型能力正在整理中，请稍后再查看。" />
       )}
     </section>
   );
@@ -2918,7 +2928,7 @@ function SupportPanel({
           <span className="eyebrow">Help center</span>
           <h2>帮助与客服</h2>
         </div>
-        <span className="section-note">首期不做工单，客服渠道由 Admin 应用配置驱动</span>
+        <span className="section-note">通过下方渠道联系 seeFactory 支持团队。</span>
       </div>
       <div className="support-layout">
         <article className="support-card primary">
@@ -2976,7 +2986,7 @@ function FaqPanel({ faqs }: { faqs: FaqItem[] }) {
           <span className="eyebrow">FAQ</span>
           <h2>常见问题</h2>
         </div>
-        <span className="section-note">FAQ 由后端 AppConfig 配置，Dashboard 不硬编码业务规则</span>
+        <span className="section-note">了解充值、生成、下载和 Workflow 使用中的常见问题。</span>
       </div>
       {grouped.length ? (
         <div className="faq-grid">
@@ -2993,7 +3003,7 @@ function FaqPanel({ faqs }: { faqs: FaqItem[] }) {
           ))}
         </div>
       ) : (
-        <EmptyBlock title="暂无 FAQ 配置" body="请在 Admin 应用配置中维护 faq.items 后再展示帮助问答。" />
+        <EmptyBlock title="暂无帮助问答" body="帮助问答正在整理中，稍后会补充更多说明。" />
       )}
     </div>
   );
@@ -3034,10 +3044,10 @@ function AgreementLinks({ onToast }: { onToast: (toast: Toast) => void }) {
     <div className="agreement-panel">
       <div className="section-title-row">
         <div>
-          <span className="eyebrow">Agreements</span>
+          <span className="eyebrow">协议</span>
           <h2>协议与规则</h2>
         </div>
-        <span className="section-note">协议正文由 Admin 发布，Dashboard 只读取已发布版本</span>
+        <span className="section-note">查看当前已生效的服务条款与隐私相关说明。</span>
       </div>
       <div className="agreement-link-grid">
         {agreementTypes.map((item) => (
@@ -3093,19 +3103,19 @@ function PricingHelp({
       <section id="pricing" className="content-band pricing-grid pricing-runway">
         <article>
           <span className="eyebrow">Wallet</span>
-          <h2>PC Dashboard 只接 Crypto</h2>
-          <p>移动端按平台支付，PC H5 复用 Crypto bridge / wallet / payment 体系。</p>
+          <h2>桌面端只支持 Crypto 充值</h2>
+          <p>移动端按所在平台支付，桌面端通过 Crypto 充值点数。</p>
         </article>
         <article>
-          <span className="eyebrow">Points</span>
+          <span className="eyebrow">点数</span>
           <h2>1 CNY = {formatPoints(pointRate)} 点</h2>
           <p>{customAmountText}，单次充值范围 {minAmount} - {maxAmount}。{payPerGenerationText}。</p>
           <p>模板购买扣模板费，后续运行只扣模型节点点数。Workflow 运行采用预估冻结和实际结算。</p>
         </article>
         <article>
-          <span className="eyebrow">Support</span>
-          <h2>帮助入口由 Admin 配置</h2>
-          <p>首期不做工单，只展示客服渠道和跳转链接。页面文案默认全中文。</p>
+          <span className="eyebrow">支持</span>
+          <h2>暂未开放在线客服</h2>
+          <p>你仍可以通过页面已展示的联系方式获得支持。</p>
         </article>
       </section>
       <SupportPanel customerService={customerService} faqs={faqs} onToast={onToast} compact />
@@ -3587,7 +3597,7 @@ function CreatePanel({
   if (!tools.length) {
     return (
       <div className="workspace-section">
-        <EmptyBlock title="暂无可用创作工具" body="创作中心完全由后端工具配置驱动，请先在 Admin 启用工具。" />
+        <EmptyBlock title="暂无可用创作工具" body="创作工具正在整理中，请稍后再试。" />
       </div>
     );
   }
@@ -4120,7 +4130,7 @@ function WorksPanel({
                     <span className="case-cover-placeholder">无预览</span>
                   )}
                   <strong>{workTitle(work)}</strong>
-                  <small>{workStatusLabel(work.status)} · {work.toolKey || "tool"} · {formatDate(work.createdAt)}</small>
+                  <small>{workStatusLabel(work.status)} · {work.toolKey || "创作工具"} · {formatDate(work.createdAt)}</small>
                   <span>{work.galleryVisible ? "已公开" : work.lockedUntilPurchase ? "锁定" : work.isIntermediateOutput ? "中间结果" : "私有"}</span>
                 </button>
               );
@@ -4152,7 +4162,7 @@ function WorksPanel({
             ) : null}
             <div className="mini-meta">
               <span>{selectedWork.toolKey || "tool"}</span>
-              <span>{selectedWork.modeKey || "default"}</span>
+                <span>{selectedWork.modeKey || "默认模式"}</span>
               <span>{Number(selectedWork.likeCount || 0)} 收藏</span>
               <span>{selectedWork.galleryVisible ? "广场公开" : "私有"}</span>
               {selectedWork.isTrialOutput ? <span>试运行</span> : null}
@@ -4168,7 +4178,7 @@ function WorksPanel({
                 <Button
                   onClick={() => {
                     if (!selectedWork.sourceCaseContentId) {
-                      onToast({ title: "缺少对应 Workflow 案例信息", tone: "danger" });
+                      onToast({ title: "未找到对应 Workflow 模板", tone: "danger" });
                       return;
                     }
                     onOpenWorkflowCase(selectedWork.sourceCaseContentId);
@@ -4493,7 +4503,7 @@ function validateWorkflowGraph(graph: WorkflowGraph, mode: "open_free" | "closed
   const executableNodes = graph.nodes.filter((node) => String(node.toolKey || (node.config as any)?.toolKey || "").trim());
   const nodeIds = new Set(graph.nodes.map((node) => String(node.id || "").trim()).filter(Boolean));
   if (!graph.nodes.length) errors.push("请先从左侧添加至少一个组件。");
-  if (!executableNodes.length) errors.push("Workflow 至少需要一个可执行生成节点，并且节点必须能映射到后端工具。");
+  if (!executableNodes.length) errors.push("Workflow 至少需要一个可运行的生成节点。");
   graph.edges.forEach((edge, index) => {
     const source = String(edge.source || edge.from || "").trim();
     const target = String(edge.target || edge.to || "").trim();
@@ -4509,7 +4519,7 @@ function validateWorkflowGraph(graph: WorkflowGraph, mode: "open_free" | "closed
   if (policy?.maxGraphNodes && graph.nodes.length > policy.maxGraphNodes) errors.push(`当前 Workflow 最多允许 ${policy.maxGraphNodes} 个节点。`);
   if (policy?.maxGraphModelNodes && executableNodes.length > policy.maxGraphModelNodes) errors.push(`当前 Workflow 最多允许 ${policy.maxGraphModelNodes} 个 AI 模型节点。`);
   const missingModels = graph.nodes.filter((node) => !String(node.modelKey || (node.config as any)?.modelKey || "").trim());
-  if (missingModels.length) warnings.push(`${missingModels.length} 个节点未绑定模型，将依赖工具默认模型或后端校验。`);
+  if (missingModels.length) warnings.push(`${missingModels.length} 个节点未绑定模型，将使用对应工具的默认模型。`);
   if (mode === "closed_paid") {
     const minPrice = Number(policy?.priceMinPoints);
     const maxPrice = Number(policy?.priceMaxPoints);
@@ -4547,7 +4557,7 @@ function nodesFromWorkflowGraph(graph: WorkflowGraph | undefined, components: Co
       displayName: String(node?.label || node?.name || config.label || componentKey),
       label: String(node?.label || node?.name || config.label || componentKey),
       category: String(node?.category || config.category || "imported"),
-      description: "从 .seeflow 或历史草稿恢复的节点。",
+      description: "从导入文件或历史草稿恢复的节点。",
       modelKey: String(node?.modelKey || config.modelKey || ""),
       ratioResolutionMap: {},
       videoQualityOptions: []
@@ -4884,7 +4894,7 @@ function WorkflowConsole({
       const serverValidation = await validateAndEstimateServerDraft(saved.id);
       setValidation(serverValidation);
       onToast({
-        title: serverValidation.valid ? `草稿已保存，预估 ${serverValidation.estimatedPoints} 点：${saved.title}` : serverValidation.errors[0] || "草稿已保存，但服务端校验未通过",
+        title: serverValidation.valid ? `草稿已保存，预估 ${serverValidation.estimatedPoints} 点：${saved.title}` : serverValidation.errors[0] || "草稿已保存，但运行校验未通过",
         tone: serverValidation.valid ? "success" : "danger"
       });
     } catch (err) {
@@ -4907,7 +4917,7 @@ function WorkflowConsole({
       const serverValidation = await validateAndEstimateServerDraft(saved.id);
       setValidation(serverValidation);
       onToast({
-        title: serverValidation.valid ? `Workflow 已通过服务端校验，预计运行 ${serverValidation.estimatedPoints} 点。` : serverValidation.errors[0] || "服务端校验未通过",
+        title: serverValidation.valid ? `Workflow 已通过运行校验，预计运行 ${serverValidation.estimatedPoints} 点。` : serverValidation.errors[0] || "运行校验未通过",
         tone: serverValidation.valid ? "success" : "danger"
       });
     } catch (err) {
@@ -4929,7 +4939,7 @@ function WorkflowConsole({
       const saved = await persistDraft();
       const serverValidation = await validateAndEstimateServerDraft(saved.id);
       setValidation(serverValidation);
-      if (!serverValidation.valid) throw new Error(serverValidation.errors[0] || "服务端校验未通过");
+      if (!serverValidation.valid) throw new Error(serverValidation.errors[0] || "运行校验未通过");
       const result = await apiPost<{ workflow?: WorkflowDraft; case?: CaseContent }>(
         `/workflows/${saved.id}/publish-case`,
         {
@@ -4982,7 +4992,7 @@ function WorkflowConsole({
         openWorkflow(workflow, false);
         setWorkflows((items) => [workflow, ...items.filter((item) => item.id !== workflow.id)]);
         if (initialRouteMode === "run") {
-          onToast({ title: "已打开 Workflow 运行入口，请填写测试提示词后提交运行。", tone: "info" });
+          onToast({ title: "已打开 Workflow 运行入口，请填写试运行提示词后提交运行。", tone: "info" });
         }
       })
       .catch((err) => onToast({ title: err instanceof Error ? err.message : "Workflow 草稿详情加载失败", tone: "danger" }))
@@ -5056,7 +5066,7 @@ function WorkflowConsole({
   const runWorkflowTest = async () => {
     const prompt = testPrompt.trim();
     if (!prompt) {
-      onToast({ title: "请先填写测试运行提示词。", tone: "danger" });
+      onToast({ title: "请先填写试运行提示词。", tone: "danger" });
       return;
     }
     setBusy("run");
@@ -5067,7 +5077,7 @@ function WorkflowConsole({
       const saved = await persistDraft();
       const serverValidation = await validateAndEstimateServerDraft(saved.id);
       setValidation(serverValidation);
-      if (!serverValidation.valid) throw new Error(serverValidation.errors[0] || "服务端校验未通过");
+      if (!serverValidation.valid) throw new Error(serverValidation.errors[0] || "运行校验未通过");
       const result = await apiPost<{ run?: WorkflowRun; nodes?: Array<Record<string, unknown>> }>(
         `/workflows/${saved.id}/run`,
         {
@@ -5077,11 +5087,11 @@ function WorkflowConsole({
         { auth: true }
       );
       onToast({
-        title: result.run?.id ? `已提交测试运行：${result.run.id.slice(-6)}` : "已提交 Workflow 测试运行",
+        title: result.run?.id ? `已提交试运行：${result.run.id.slice(-6)}` : "已提交 Workflow 试运行",
         tone: "success"
       });
     } catch (err) {
-      onToast({ title: err instanceof Error ? err.message : "Workflow 测试运行失败", tone: "danger" });
+      onToast({ title: err instanceof Error ? err.message : "Workflow 试运行失败", tone: "danger" });
     } finally {
       setBusy("");
     }
@@ -5121,7 +5131,7 @@ function WorkflowConsole({
           <div className="component-empty">
             <Icon name="empty" />
             <span>暂无组件定义</span>
-            <small>请在 Admin 的组件定义中配置 ComponentDefinition。</small>
+            <small>暂无可用组件，请稍后再创建 Workflow。</small>
           </div>
         )}
         <div className="workflow-drafts">
@@ -5136,7 +5146,7 @@ function WorkflowConsole({
               <button key={workflow.id} className={draft?.id === workflow.id ? "active" : ""} onClick={() => openWorkflow(workflow)}>
                 <Icon name="list" />
                 <span>{workflow.title}</span>
-                <small>{workflow.status || "draft"}</small>
+                <small>{paymentStatusLabel(workflow.status || "draft")}</small>
               </button>
             ))
           ) : (
@@ -5199,7 +5209,7 @@ function WorkflowConsole({
       <div className="canvas-panel">
         <div className="canvas-head">
           <div>
-            <span className="eyebrow">Low-code workflow</span>
+            <span className="eyebrow">低代码 Workflow</span>
             <h2>从组件库编排可发布、可购买、可运行的创作链路</h2>
           </div>
           <div className="segmented">
@@ -5260,8 +5270,8 @@ function WorkflowConsole({
             <input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="用逗号分隔，例如 商品图, 海报, 16:9" />
           </label>
           <label className="field-wide">
-            <span>测试运行提示词</span>
-            <textarea value={testPrompt} onChange={(event) => setTestPrompt(event.target.value)} placeholder="填写一次真实测试运行的提示词。测试运行会冻结并消耗对应模型节点点数。" />
+            <span>试运行提示词</span>
+            <textarea value={testPrompt} onChange={(event) => setTestPrompt(event.target.value)} placeholder="填写一次真实试运行的提示词。试运行会冻结并消耗对应模型节点点数。" />
           </label>
           {mode === "closed_paid" ? (
             <>
@@ -5276,7 +5286,7 @@ function WorkflowConsole({
               <label>
                 <span>试运行次数</span>
                 <input type="number" min={0} max={trialLimitMaxPerUser} value={trialLimitPerUser} onChange={(event) => setTrialLimitPerUser(Number(event.target.value || 0))} />
-                <small>Admin 当前允许每人最多试运行 {trialLimitMaxPerUser} 次。</small>
+                <small>当前最多可开放每人试运行 {trialLimitMaxPerUser} 次。</small>
               </label>
               <label className="check-field">
                 <input type="checkbox" checked={trialEnabled} onChange={(event) => setTrialEnabled(event.target.checked)} />
@@ -5290,12 +5300,12 @@ function WorkflowConsole({
           <article>
             <span>发布模式</span>
             <strong>{mode === "closed_paid" ? "闭源付费" : "开源免费"}</strong>
-            <small>{mode === "closed_paid" ? `售价 ${pricePoints} 点，购买后只开放运行权` : "公开 graph，允许克隆和导出 .seeflow"}</small>
+            <small>{mode === "closed_paid" ? `售价 ${pricePoints} 点，购买后只开放运行权` : "公开流程图，允许克隆和导出 .seeflow"}</small>
           </article>
           <article>
             <span>节点完整度</span>
             <strong>{toolBoundCount}/{selectedNodes.length || 0} 工具 · {modelBoundCount}/{selectedNodes.length || 0} 模型</strong>
-            <small>{selectedNodes.length ? "缺模型时会依赖工具默认模型或服务端校验" : "请先从组件库添加节点"}</small>
+            <small>{selectedNodes.length ? "未选择模型的节点会使用对应工具默认模型" : "请先从组件库添加节点"}</small>
           </article>
           <article>
             <span>运行表单</span>
@@ -5306,7 +5316,7 @@ function WorkflowConsole({
 
         <div className="workflow-runform-preview">
           <div>
-            <span className="eyebrow">Run form preview</span>
+            <span className="eyebrow">运行表单预览</span>
             <strong>运行者将看到的参数</strong>
           </div>
           {exposedRunFields.length ? (
@@ -5401,7 +5411,7 @@ function WorkflowConsole({
             </div>
           </div>
         ) : (
-          <EmptyBlock title="画布等待组件配置" body="Dashboard 不会在前端硬编码节点，组件库需由后端 /components 下发。" />
+          <EmptyBlock title="暂无可用组件" body="组件库暂时为空，请稍后再创建 Workflow。" />
         )}
         </div>
 
@@ -5409,7 +5419,7 @@ function WorkflowConsole({
           <div className="node-config-panel">
             <div className="section-title-row">
               <div>
-                <span className="eyebrow">Node config</span>
+                <span className="eyebrow">节点配置</span>
                 <h2>{componentTitle(activeNode.component)}</h2>
               </div>
               <span className="section-note">{componentCategoryLabel(activeNode.component)}</span>
@@ -5438,11 +5448,11 @@ function WorkflowConsole({
                   <option value="">跟随组件或工具默认模型</option>
                   {activeModelOptions.map((model) => (
                     <option value={model.modelKey} key={model.modelKey}>
-                      {model.name || model.modelKey} · {model.modality || model.nodeType || "model"} · {model.pricePoints || 0} 点
+                      {model.name || model.modelKey} · {model.modality || model.nodeType || "模型"} · {model.pricePoints || 0} 点
                     </option>
                   ))}
                 </select>
-                {!activeModelOptions.length ? <small>暂无可选模型，请先在 Admin 映射并上线平台模型。</small> : null}
+                {!activeModelOptions.length ? <small>当前节点暂时没有可选模型，可以选择其他组件或稍后再试。</small> : null}
               </label>
               <label>
                 <span>节点预估点数</span>
@@ -5522,7 +5532,7 @@ function WorkflowConsole({
           {[...currentValidation.errors, ...currentValidation.warnings].map((message) => (
             <small key={message}>{message}</small>
           ))}
-          {draft?.id ? <small>当前草稿：{draft.id}</small> : <small>尚未保存到后端草稿。</small>}
+          {draft?.id ? <small>当前草稿：{draft.id}</small> : <small>尚未保存草稿。</small>}
         </div>
 
         <div className="canvas-footer">
@@ -5536,7 +5546,7 @@ function WorkflowConsole({
           </Button>
           <Button variant="ghost" onClick={runWorkflowTest} disabled={Boolean(busy)}>
             <Icon name="play" />
-            {busy === "run" ? "运行中" : "测试运行"}
+            {busy === "run" ? "运行中" : "试运行"}
           </Button>
           <Button onClick={publishWorkflow} disabled={Boolean(busy)}>
             <Icon name="upload" />
@@ -5738,8 +5748,8 @@ function WorkflowCasePanel({
                 <p>
                   {selectedCase.licenseMode === "closed_paid"
                     ? status?.purchased
-                      ? "你已获得该发布版本的永久运行权，历史试运行作品会自动解锁下载和发布；购买不包含 graph、克隆或导出权限。"
-                      : "购买后获得该发布版本的永久运行权；后续运行仍按模型节点扣点，不会开放 graph、克隆或 .seeflow 导出。"
+                      ? "你已获得该发布版本的永久运行权，历史试运行作品会自动解锁下载和发布；购买不包含流程图、克隆或导出权限。"
+                      : "购买后获得该发布版本的永久运行权；后续运行仍按模型节点扣点，不会开放流程图、克隆或 .seeflow 导出。"
                     : "开源免费案例允许登录后运行、克隆为私有草稿，并导出公开 .seeflow。"}
                 </p>
                 {selectedLifecycleNote ? <p className="workflow-lifecycle-note">{selectedLifecycleNote}</p> : null}
@@ -5793,7 +5803,7 @@ function WorkflowCasePanel({
               ) : null}
             </div>
             {selectedCase.licenseMode === "closed_paid" && !status?.purchased ? (
-              <p className="muted-text">闭源付费案例购买后仅获得运行权，不会返回 graph、克隆或导出权限。</p>
+              <p className="muted-text">闭源付费案例购买后仅获得运行权，不会开放流程图、克隆或导出权限。</p>
             ) : null}
           </>
         ) : (
@@ -6163,7 +6173,7 @@ function RunsPanel({ onToast }: { onToast: (toast: Toast) => void }) {
         setSelectedRun(data.run);
         setNodes(data.nodes || []);
         setItems((current) => current.map((item) => item.id === run.id ? data.run : item));
-        onToast({ title: "Workflow 已取消，未消耗冻结点数会按后端规则释放。", tone: "success" });
+        onToast({ title: "Workflow 已取消，未消耗的点数会自动退回。", tone: "success" });
         loadRuns();
       })
       .catch((err) => onToast({ title: err.message || "取消 Workflow 失败", tone: "danger" }))
@@ -6443,7 +6453,7 @@ function WalletPanel({ onToast }: { onToast: (toast: Toast) => void }) {
       </div>
       <div className="wide-panel">
         <h2>Crypto 充值</h2>
-        <p>PC Dashboard 只开放 Crypto 支付。充值以人民币金额创建点数订单，再通过 Crypto bridge 生成稳定币收款地址；提现和退款入口首期不开放。</p>
+        <p>桌面端仅开放 Crypto 支付。输入人民币充值金额后，系统会生成稳定币收款地址；暂不提供提现和退款入口。</p>
         {error ? <p className="danger-text">{error}</p> : null}
         <div className="wallet-layout">
           <section className="wallet-form">
@@ -6626,9 +6636,9 @@ function AccountPanel({ onToast }: { onToast: (toast: Toast) => void }) {
             <div className="account-avatar-fallback">{(user?.nickname || "S").slice(0, 1).toUpperCase()}</div>
           )}
           <div>
-            <span className="eyebrow">Account</span>
+            <span className="eyebrow">账户</span>
             <h2>{user?.nickname || "seeFactory 用户"}</h2>
-            <p>PC H5 支持 Google、X、Telegram Login Widget。Telegram Web 登录与 TMA 身份由后端统一绑定。</p>
+            <p>你可以使用 Google、X 或 Telegram 登录。同一个 Telegram 身份会在网页和小程序中保持一致。</p>
           </div>
         </div>
         {error ? <p className="danger-text">{error}</p> : null}
@@ -6657,16 +6667,16 @@ function AccountPanel({ onToast }: { onToast: (toast: Toast) => void }) {
       <div className="wide-panel">
         <div className="section-title-row">
           <div>
-            <span className="eyebrow">Login identities</span>
+            <span className="eyebrow">登录身份</span>
             <h2>登录方式</h2>
           </div>
-          <span className="section-note">用户端不开放解绑，身份调整由 Admin 审计操作</span>
+          <span className="section-note">如需调整登录方式，请联系 seeFactory 支持。</span>
         </div>
         <div className="identity-grid">
           {[
-            ["Google", "google", "H5 Google Identity Services 登录，后端校验 ID Token。"],
-            ["X", "badge", "H5 X OAuth2 PKCE 登录，回调后由后端换取用户身份。"],
-            ["Telegram", "telegram", "Telegram Login Widget 登录，后端验签并与 TMA Telegram 身份归一。"]
+            ["Google", "google", "使用 Google 账号快速登录 seeFactory。"],
+            ["X", "badge", "使用 X 账号授权登录 seeFactory。"],
+            ["Telegram", "telegram", "使用 Telegram 账号登录，并与 Telegram 小程序中的身份保持一致。"]
           ].map(([title, icon, body]) => (
             <article className="identity-card" key={title}>
               <Icon name={icon} />
@@ -6969,13 +6979,13 @@ function ShareWorkPage({
       ) : work ? (
         <div className="share-work-layout">
           <div>
-            <span className="eyebrow">Shared work</span>
+            <span className="eyebrow">分享作品</span>
             <h1>{workTitle(work)}</h1>
-            <p>这是 seeFactory 用户分享的作品。你可以查看提示词和参数快照；下载与同款创作均按后端权限规则执行。</p>
+            <p>这是 seeFactory 用户分享的作品。你可以查看提示词和参数快照；下载与同款创作需要登录，并会遵循作品作者设置的权限。</p>
             <div className="mini-meta">
               <span>{work.author?.nickname || "seeFactory 用户"}</span>
-              <span>{work.toolKey || "tool"}</span>
-              <span>{work.modeKey || "default"}</span>
+              <span>{work.toolKey || "创作工具"}</span>
+              <span>{work.modeKey || "默认模式"}</span>
               <span>{formatDate(work.createdAt)}</span>
               <span>{Number(work.likeCount || 0)} 收藏</span>
             </div>

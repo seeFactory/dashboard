@@ -126,7 +126,7 @@ for (const pattern of [
   "暂无公开案例",
   "暂无公开作品",
   "暂无可用模型",
-  "暂无组件定义"
+  "暂无可用组件"
 ]) {
   includes(pattern, `Dashboard backend-driven public data contract must include ${pattern}.`);
 }
@@ -138,7 +138,7 @@ for (const pattern of [
   'return "作品案例"',
   'return "Workflow 案例"',
   "公开案例广场",
-  "提示词、公开作品与 Workflow 统一展示"
+  "提示词、作品和 Workflow 模板会统一展示在这里。"
 ]) {
   includes(pattern, `Dashboard unified CaseContent square contract must include ${pattern}.`);
 }
@@ -365,7 +365,7 @@ for (const pattern of [
   "workflow-lifecycle-note",
   "进入已购模板库",
   "购买后获得该发布版本的永久运行权",
-  "购买不包含 graph、克隆或导出权限",
+  "购买不包含流程图、克隆或导出权限",
   "case-run-form",
   "闭源付费案例购买后仅获得运行权",
   "已购买该 Workflow"
@@ -496,10 +496,10 @@ for (const pattern of [
   "function AccountPanel",
   'apiGet<AuthMe>("/auth/me", { auth: true })',
   'apiGet<CreditBalance>("/credits/balance", { auth: true })',
-  "用户端不开放解绑",
-  "Google Identity Services",
-  "X OAuth2 PKCE",
-  "Telegram Login Widget",
+  "如需调整登录方式，请联系 seeFactory 支持。",
+  "使用 Google 账号快速登录 seeFactory。",
+  "使用 X 账号授权登录 seeFactory。",
+  "使用 Telegram 账号登录，并与 Telegram 小程序中的身份保持一致。",
   "复制用户 ID",
   "协议与规则"
 ]) {
@@ -512,7 +512,7 @@ for (const pattern of [
   "`/works/share/${encodeURIComponent(ticket)}`",
   "apiGet<DownloadUrl>(`/works/${work.id}/download-url?shareTicket=${encodeURIComponent(ticket)}`, { auth: true })",
   "onToast({ title: \"请先登录后再下载作品\", tone: \"info\" })",
-  "Shared work",
+  "分享作品",
   "分享作品不可访问",
   "这是 seeFactory 用户分享的作品",
   "同款生成任务已创建",
@@ -538,14 +538,14 @@ for (const pattern of [
   "复制微信",
   "打开 Telegram",
   "发送邮件",
-  "客服渠道由 Admin 应用配置驱动",
-  "FAQ 由后端 AppConfig 配置",
-  "暂无 FAQ 配置",
+  "通过下方渠道联系 seeFactory 支持团队。",
+  "了解充值、生成、下载和 Workflow 使用中的常见问题。",
+  "暂无帮助问答",
   "1 CNY = {formatPoints(pointRate)} 点",
   "支持自填充值金额",
   "本次生成直付暂不开放",
   "`/agreements/${type}`",
-  "协议正文由 Admin 发布",
+  "查看当前已生效的服务条款与隐私相关说明。",
   "打开外部协议链接",
   "用户协议",
   "隐私政策",
