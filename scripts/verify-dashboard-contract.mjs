@@ -285,6 +285,12 @@ for (const pattern of [
   "function createEditorNode",
   "function nodesFromWorkflowGraph",
   "function exposedFieldsForNode",
+  "upstreamNodeKeys",
+  "function normalizeWorkflowNodeLinks",
+  "const nodeIdByKey = new Map",
+  "`edge_${nodeIdByKey.get(sourceKey)}_${target}`",
+  "function validateWorkflowGraph(graph",
+  "连线不能连接节点自身",
   "dragComponentKey",
   "dragNodeKey",
   "canvasDropActive",
@@ -293,8 +299,12 @@ for (const pattern of [
   "setDragComponentKey(component.componentKey)",
   "workflow-drop-zone",
   "dropNodeOn",
+  "toggleUpstreamNode",
   "node-config-panel",
+  "upstream-fields-grid",
   "exposed-fields-grid",
+  "上游连接",
+  "输入来自",
   "overrides.promptTemplate || \"{{prompt}}\""
 ]) {
   includes(pattern, `Dashboard workflow authoring contract must include ${pattern}.`);
@@ -573,6 +583,7 @@ for (const pattern of [
   ".lane.dragging",
   ".node-config-panel",
   ".node-config-grid",
+  ".upstream-fields-grid",
   ".exposed-fields-grid",
   ".case-action-buttons",
   ".case-action-buttons .button",

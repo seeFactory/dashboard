@@ -202,6 +202,7 @@ type ComponentDefinition = {
 type WorkflowEditorNode = {
   nodeKey: string;
   component: ComponentDefinition;
+  upstreamNodeKeys: string[];
   promptTemplate: string;
   toolKey?: string;
   modelKey?: string;
@@ -4080,6 +4081,7 @@ function createEditorNode(component: ComponentDefinition, overrides: Partial<Wor
   return {
     nodeKey: overrides.nodeKey || editorNodeKey(),
     component,
+    upstreamNodeKeys: Array.isArray(overrides.upstreamNodeKeys) ? overrides.upstreamNodeKeys : [],
     promptTemplate: overrides.promptTemplate || "{{prompt}}",
     toolKey: overrides.toolKey || "",
     modelKey: overrides.modelKey || component.modelKey || "",
@@ -4090,6 +4092,15 @@ function createEditorNode(component: ComponentDefinition, overrides: Partial<Wor
     exposeQuality: overrides.exposeQuality ?? kind === "video",
     exposeUpload: overrides.exposeUpload ?? false
   };
+}
+
+function normalizeWorkflowNodeLinks(nodes: WorkflowEditorNode[]) {
+  const previousKeys = new Set<string>();
+  return nodes.map((node) => {
+    const upstreamNodeKeys = unique(node.upstreamNodeKeys || []).filter((key) => previousKeys.has(key));
+    previousKeys.add(node.nodeKey);
+    return { ...node, upstreamNodeKeys };
+  });
 }
 
 function exposedFieldsForNode(node: WorkflowEditorNode) {
@@ -4103,6 +4114,7 @@ function exposedFieldsForNode(node: WorkflowEditorNode) {
 }
 
 function buildWorkflowGraph(selectedNodes: WorkflowEditorNode[], tools: Tool[]): WorkflowGraph {
+  const nodeIdByKey = new Map(selectedNodes.map((editorNode, index) => [editorNode.nodeKey, `node_${index + 1}`]));
   const nodes = selectedNodes.map((editorNode, index) => {
     const component = editorNode.component;
     const tool = editorNode.toolKey
@@ -4141,13 +4153,19 @@ function buildWorkflowGraph(selectedNodes: WorkflowEditorNode[], tools: Tool[]):
       }
     };
   });
-  const edges = nodes.slice(1).map((node, index) => ({
-    id: `edge_${index + 1}`,
-    source: `node_${index + 1}`,
-    target: node.id,
-    sourceHandle: "output",
-    targetHandle: "input"
-  }));
+  const edges = selectedNodes.flatMap((editorNode, index) => {
+    const target = nodeIdByKey.get(editorNode.nodeKey);
+    if (!target) return [];
+    const allowedPreviousKeys = new Set(selectedNodes.slice(0, index).map((node) => node.nodeKey));
+    const upstreamKeys = unique(editorNode.upstreamNodeKeys || []).filter((key) => allowedPreviousKeys.has(key));
+    return upstreamKeys.map((sourceKey) => ({
+      id: `edge_${nodeIdByKey.get(sourceKey)}_${target}`,
+      source: nodeIdByKey.get(sourceKey),
+      target,
+      sourceHandle: "output",
+      targetHandle: "input"
+    }));
+  });
   return {
     schemaVersion: "seeFactory.workflow.v1",
     nodes,
@@ -4207,8 +4225,21 @@ function validateWorkflowGraph(graph: WorkflowGraph, mode: "open_free" | "closed
   const errors: string[] = [];
   const warnings: string[] = [];
   const executableNodes = graph.nodes.filter((node) => String(node.toolKey || (node.config as any)?.toolKey || "").trim());
+  const nodeIds = new Set(graph.nodes.map((node) => String(node.id || "").trim()).filter(Boolean));
   if (!graph.nodes.length) errors.push("请先从左侧添加至少一个组件。");
   if (!executableNodes.length) errors.push("Workflow 至少需要一个可执行生成节点，并且节点必须能映射到后端工具。");
+  graph.edges.forEach((edge, index) => {
+    const source = String(edge.source || edge.from || "").trim();
+    const target = String(edge.target || edge.to || "").trim();
+    if (!source || !target) {
+      errors.push(`第 ${index + 1} 条连线缺少 source 或 target。`);
+    } else {
+      if (!nodeIds.has(source)) errors.push(`第 ${index + 1} 条连线的 source 不存在：${source}。`);
+      if (!nodeIds.has(target)) errors.push(`第 ${index + 1} 条连线的 target 不存在：${target}。`);
+      if (source === target) errors.push(`第 ${index + 1} 条连线不能连接节点自身。`);
+    }
+  });
+  if (graph.nodes.length > 1 && graph.edges.length === 0) warnings.push("当前 Workflow 没有连线，将按多个独立节点运行；如需顺序或合流，请在节点配置中选择上游节点。");
   if (policy?.maxGraphNodes && graph.nodes.length > policy.maxGraphNodes) errors.push(`当前 Workflow 最多允许 ${policy.maxGraphNodes} 个节点。`);
   if (policy?.maxGraphModelNodes && executableNodes.length > policy.maxGraphModelNodes) errors.push(`当前 Workflow 最多允许 ${policy.maxGraphModelNodes} 个 AI 模型节点。`);
   const missingModels = graph.nodes.filter((node) => !String(node.modelKey || (node.config as any)?.modelKey || "").trim());
@@ -4240,7 +4271,7 @@ function parseTags(value: string) {
 
 function nodesFromWorkflowGraph(graph: WorkflowGraph | undefined, components: ComponentDefinition[], tools: Tool[] = []) {
   const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
-  return nodes.map((node: any, index) => {
+  const restored = nodes.map((node: any, index) => {
     const config = node?.config && typeof node.config === "object" ? node.config : {};
     const componentKey = String(node?.componentKey || node?.type || config.componentKey || `imported.node.${index + 1}`);
     const found = components.find((component) => component.componentKey === componentKey);
@@ -4271,6 +4302,24 @@ function nodesFromWorkflowGraph(graph: WorkflowGraph | undefined, components: Co
       exposeUpload: exposed.includes("inputAssetIds") || exposed.includes("inputAssets")
     });
   });
+  const nodeIdToEditorKey = new Map(nodes.map((node: any, index) => [
+    String(node?.id || node?.nodeId || `node_${index + 1}`).trim(),
+    restored[index]?.nodeKey
+  ]));
+  const incoming = new Map<string, string[]>();
+  const edges = Array.isArray(graph?.edges) ? graph?.edges || [] : [];
+  edges.forEach((edge: any) => {
+    const sourceKey = nodeIdToEditorKey.get(String(edge?.source || edge?.from || edge?.sourceNodeId || "").trim());
+    const targetKey = nodeIdToEditorKey.get(String(edge?.target || edge?.to || edge?.targetNodeId || "").trim());
+    if (!sourceKey || !targetKey) return;
+    incoming.set(targetKey, [...(incoming.get(targetKey) || []), sourceKey]);
+  });
+  return normalizeWorkflowNodeLinks(restored.map((node, index) => {
+    const upstreamNodeKeys = incoming.get(node.nodeKey);
+    if (upstreamNodeKeys?.length) return { ...node, upstreamNodeKeys };
+    if (!edges.length && index > 0) return { ...node, upstreamNodeKeys: [restored[index - 1].nodeKey] };
+    return node;
+  }));
 }
 
 function downloadJsonFile(filename: string, data: unknown) {
@@ -4354,6 +4403,8 @@ function WorkflowConsole({
   const graph = buildWorkflowGraph(selectedNodes, tools);
   const currentValidation = validation || validateWorkflowGraph(graph, mode, pricePoints, workflowPolicy);
   const activeNode = selectedNodes.find((node) => node.nodeKey === activeNodeKey) || selectedNodes[0] || null;
+  const activeNodeIndex = activeNode ? selectedNodes.findIndex((node) => node.nodeKey === activeNode.nodeKey) : -1;
+  const upstreamCandidates = activeNodeIndex > 0 ? selectedNodes.slice(0, activeNodeIndex) : [];
   const priceMinPoints = Math.max(1, Number(workflowPolicy?.priceMinPoints || 1));
   const priceMaxPoints = Number.isFinite(Number(workflowPolicy?.priceMaxPoints)) ? Math.max(priceMinPoints, Number(workflowPolicy?.priceMaxPoints)) : undefined;
   const trialLimitMaxPerUser = Math.max(0, Number(workflowPolicy?.trialLimitMaxPerUser ?? 0));
@@ -4366,12 +4417,13 @@ function WorkflowConsole({
         onToast({ title: `当前发布策略最多允许 ${workflowNodeLimit} 个节点。`, tone: "info" });
         return current;
       }
-      const nextNode = createEditorNode(component);
-      setActiveNodeKey(nextNode.nodeKey);
       const next = [...current];
       const target = typeof index === "number" ? Math.max(0, Math.min(index, next.length)) : next.length;
+      const upstreamNodeKeys = target > 0 && next[target - 1] ? [next[target - 1].nodeKey] : [];
+      const nextNode = createEditorNode(component, { upstreamNodeKeys });
+      setActiveNodeKey(nextNode.nodeKey);
       next.splice(target, 0, nextNode);
-      return next;
+      return normalizeWorkflowNodeLinks(next);
     });
     setValidation(null);
   };
@@ -4381,7 +4433,9 @@ function WorkflowConsole({
   };
 
   const removeNode = (nodeKey: string) => {
-    setSelectedNodes((current) => current.filter((node) => node.nodeKey !== nodeKey));
+    setSelectedNodes((current) => normalizeWorkflowNodeLinks(current
+      .filter((node) => node.nodeKey !== nodeKey)
+      .map((node) => ({ ...node, upstreamNodeKeys: (node.upstreamNodeKeys || []).filter((key) => key !== nodeKey) }))));
     if (activeNodeKey === nodeKey) setActiveNodeKey("");
     setValidation(null);
   };
@@ -4399,7 +4453,7 @@ function WorkflowConsole({
       const next = [...current];
       const [moved] = next.splice(index, 1);
       next.splice(target, 0, moved);
-      return next;
+      return normalizeWorkflowNodeLinks(next);
     });
     setValidation(null);
   };
@@ -4413,10 +4467,19 @@ function WorkflowConsole({
       const next = [...current];
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
-      return next;
+      return normalizeWorkflowNodeLinks(next);
     });
     setDragNodeKey("");
     setValidation(null);
+  };
+
+  const toggleUpstreamNode = (sourceNodeKey: string) => {
+    if (!activeNode) return;
+    const currentKeys = activeNode.upstreamNodeKeys || [];
+    const upstreamNodeKeys = currentKeys.includes(sourceNodeKey)
+      ? currentKeys.filter((key) => key !== sourceNodeKey)
+      : [...currentKeys, sourceNodeKey];
+    updateNode(activeNode.nodeKey, { upstreamNodeKeys });
   };
 
   const handleCanvasDragOver = (event: React.DragEvent<HTMLDivElement>) => {
@@ -4880,6 +4943,10 @@ function WorkflowConsole({
             {selectedNodes.map((node, index) => {
               const component = node.component;
               const tool = node.toolKey ? tools.find((item) => item.toolKey === node.toolKey) : resolveToolForComponent(component, tools);
+              const upstreamLabels = (node.upstreamNodeKeys || [])
+                .map((key) => selectedNodes.find((item) => item.nodeKey === key))
+                .filter(Boolean)
+                .map((item) => componentTitle((item as WorkflowEditorNode).component));
               return (
               <div
                 className={`lane ${activeNode?.nodeKey === node.nodeKey ? "selected" : ""} ${dragNodeKey === node.nodeKey ? "dragging" : ""}`}
@@ -4896,6 +4963,7 @@ function WorkflowConsole({
                   {componentTitle(component)}
                 </div>
                 <small>{node.modelKey || component.modelKey || "使用工具默认模型"}</small>
+                <small>{upstreamLabels.length ? `输入来自：${upstreamLabels.join("、")}` : index === 0 ? "起始节点" : "未选择上游节点"}</small>
                 <div className="node-actions">
                   <button className="node-remove" onClick={(event) => { event.stopPropagation(); moveNode(node.nodeKey, -1); }} disabled={index === 0}>
                     上移
@@ -4966,6 +5034,21 @@ function WorkflowConsole({
                   placeholder="支持 {{prompt}}、{{ratio}}、{{resolution}}、{{quality}} 等运行表单变量"
                 />
               </label>
+              <div className="field-wide upstream-fields-grid">
+                <span>上游连接</span>
+                {upstreamCandidates.length ? upstreamCandidates.map((candidate) => (
+                  <label className="check-field" key={candidate.nodeKey}>
+                    <input
+                      type="checkbox"
+                      checked={(activeNode.upstreamNodeKeys || []).includes(candidate.nodeKey)}
+                      onChange={() => toggleUpstreamNode(candidate.nodeKey)}
+                    />
+                    <span>{componentTitle(candidate.component)}</span>
+                  </label>
+                )) : (
+                  <small>当前节点是画布中的起始节点，不需要选择上游输入。</small>
+                )}
+              </div>
               <div className="field-wide exposed-fields-grid">
                 <span>运行者可修改字段</span>
                 {[
