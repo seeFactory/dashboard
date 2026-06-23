@@ -4,6 +4,10 @@ import path from "node:path";
 
 const distDir = path.resolve("dist");
 const requiredApiBase = "https://api.seefactory.xyz/api/v1";
+const requiredTelegramBotUsername =
+  process.env.VITE_SEEFACTORY_TELEGRAM_BOT_USERNAME ||
+  process.env.VITE_TELEGRAM_BOT_USERNAME ||
+  "seefactory_bot";
 const forbiddenPatterns = [
   "http://127.0.0.1",
   "https://127.0.0.1",
@@ -37,11 +41,17 @@ for (const file of files) {
 }
 
 assert.ok(joined.includes(requiredApiBase), `Dashboard production artifacts must include ${requiredApiBase}.`);
+assert.ok(
+  joined.includes(requiredTelegramBotUsername),
+  `Dashboard production artifacts must include Telegram bot username ${requiredTelegramBotUsername}.`
+);
 
 console.log(JSON.stringify({
   checked: [
     "Dashboard production API base is embedded",
+    "Dashboard production artifacts embed Telegram Login Widget bot username",
     "Dashboard production artifacts exclude localhost and origin-IP API bases"
   ],
-  apiBase: requiredApiBase
+  apiBase: requiredApiBase,
+  telegramBotUsername: requiredTelegramBotUsername
 }, null, 2));

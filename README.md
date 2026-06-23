@@ -67,10 +67,10 @@ https://api.seefactory.xyz/api/v1
 VITE_SEEFACTORY_API_BASE=https://api.seefactory.xyz/api/v1
 VITE_SEEFACTORY_GOOGLE_CLIENT_ID=
 VITE_SEEFACTORY_X_REDIRECT_URI=
-VITE_SEEFACTORY_TELEGRAM_BOT_USERNAME=
+VITE_SEEFACTORY_TELEGRAM_BOT_USERNAME=seefactory_bot
 ```
 
-生产构建必须使用 `VITE_SEEFACTORY_API_BASE=https://api.seefactory.xyz/api/v1`，产物中不得出现 `localhost`、`127.0.0.1` 或源站 IP API 地址。
+生产构建必须使用 `VITE_SEEFACTORY_API_BASE=https://api.seefactory.xyz/api/v1`，并注入 `VITE_SEEFACTORY_TELEGRAM_BOT_USERNAME=seefactory_bot`，让登录弹窗渲染 Telegram Login Widget。产物中不得出现 `localhost`、`127.0.0.1` 或源站 IP API 地址。
 
 ## 开发
 
