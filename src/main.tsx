@@ -1847,7 +1847,7 @@ function Hero({
           <img src={posterUrl} alt="热门模板" />
           <div className="tile-shade" />
           <div className="tile-copy bottom-left">
-            <span>Hot templates</span>
+            <span>热门模板</span>
             <strong>开源 / 闭源 Workflow 模板</strong>
           </div>
         </div>
@@ -2065,7 +2065,7 @@ function HomeGalleryPreview({
                 {url ? (isVideoUrl(url) || work.contentType === "video" ? <video src={url} preload="metadata" /> : <img src={url} alt={workTitle(work)} loading="lazy" />) : <span className="case-cover-placeholder">暂无预览</span>}
                 <div className="tile-shade" />
                 <strong>{work.galleryTitle || work.title || "未命名作品"}</strong>
-                <span>{work.author?.nickname || "seeFactory 用户"} · {work.toolKey || "tool"}</span>
+                <span>{work.author?.nickname || "seeFactory 用户"} · {work.toolKey || "创作工具"}</span>
               </button>
             );
           })}
@@ -2118,7 +2118,7 @@ function HomePricingBlock({
   return (
     <section id="pricing" className="content-band rh-section pricing-runway">
       <article>
-        <span className="eyebrow">Wallet</span>
+        <span className="eyebrow">钱包</span>
         <h2>桌面端采用 Crypto 充值</h2>
         <p>移动端按所在平台支付，桌面端通过 Crypto 充值点数。</p>
       </article>
@@ -2128,7 +2128,7 @@ function HomePricingBlock({
         <p>支持自填金额充值；每次生成或运行前都会展示预估点数，确认后再扣除。</p>
       </article>
       <article>
-        <span className="eyebrow">Workflow</span>
+          <span className="eyebrow">工作流</span>
         <h2>预估冻结 + 实际结算</h2>
         <p>失败释放未消耗部分，购买闭源模板后永久获得该发布版本运行权。</p>
       </article>
@@ -2379,7 +2379,7 @@ function CaseSquare({
     <section id="cases" className="content-band">
       <div className="section-title-row">
         <div>
-          <span className="eyebrow">Cases</span>
+          <span className="eyebrow">案例</span>
           <h2>公开案例广场</h2>
         </div>
         <span className="section-note">浏览提示词、作品和 Workflow 模板；登录后可收藏、下载、同款创作或运行。</span>
@@ -2496,7 +2496,7 @@ function StaticCaseSquare({ cases }: { cases: CaseContent[] }) {
     <section id="cases" className="content-band">
       <div className="section-title-row">
         <div>
-          <span className="eyebrow">Cases</span>
+          <span className="eyebrow">案例</span>
           <h2>公开案例广场</h2>
         </div>
         <span className="section-note">提示词、作品和 Workflow 模板会统一展示在这里。</span>
@@ -2791,7 +2791,7 @@ function GalleryPanel({
             <>
               <div className="section-title-row">
                 <div>
-                  <span className="eyebrow">Showcase detail</span>
+              <span className="eyebrow">作品详情</span>
                   <h2>{workTitle(selectedWork)}</h2>
                 </div>
                 <span className="section-note">{selectedWork.author?.nickname || "seeFactory 用户"}</span>
@@ -2925,7 +2925,7 @@ function SupportPanel({
     <section id="help" className={compact ? "content-band support-panel compact" : "workspace-section support-panel"}>
       <div className="section-title-row rh-title-row">
         <div>
-          <span className="eyebrow">Help center</span>
+          <span className="eyebrow">帮助中心</span>
           <h2>帮助与客服</h2>
         </div>
         <span className="section-note">通过下方渠道联系 seeFactory 支持团队。</span>
@@ -2983,7 +2983,7 @@ function FaqPanel({ faqs }: { faqs: FaqItem[] }) {
     <div className="faq-panel">
       <div className="section-title-row">
         <div>
-          <span className="eyebrow">FAQ</span>
+          <span className="eyebrow">常见问题</span>
           <h2>常见问题</h2>
         </div>
         <span className="section-note">了解充值、生成、下载和 Workflow 使用中的常见问题。</span>
@@ -3063,7 +3063,7 @@ function AgreementLinks({ onToast }: { onToast: (toast: Toast) => void }) {
         <article className="agreement-viewer">
           <div className="section-title-row">
             <div>
-              <span className="eyebrow">{agreement.type}</span>
+              <span className="eyebrow">{agreementTypes.find((item) => item.type === agreement.type)?.label || "协议"}</span>
               <h3>{agreement.title}</h3>
             </div>
             <span className="section-note">版本 {agreement.version || "--"} · {formatDate(agreement.publishedAt || agreement.updatedAt)}</span>
@@ -3102,7 +3102,7 @@ function PricingHelp({
     <>
       <section id="pricing" className="content-band pricing-grid pricing-runway">
         <article>
-          <span className="eyebrow">Wallet</span>
+          <span className="eyebrow">钱包</span>
           <h2>桌面端只支持 Crypto 充值</h2>
           <p>移动端按所在平台支付，桌面端通过 Crypto 充值点数。</p>
         </article>
@@ -3248,7 +3248,7 @@ function DashboardShell({
       <main className="workspace rh-workspace">
         <header className="workspace-head rh-workspace-head">
           <div>
-            <span className="eyebrow">Creator workspace</span>
+          <span className="eyebrow">创作工作台</span>
             <h1>{title}</h1>
           </div>
           <Button variant="primary" onClick={() => onToast({ title: "已创建空白 Workflow 草稿", tone: "success" })}>
@@ -3305,7 +3305,7 @@ function Overview({
         <strong>{components.length}</strong>
       </div>
       <div className="wide-panel spotlight-panel">
-        <span className="eyebrow">Next</span>
+            <span className="eyebrow">下一步</span>
         <h2>从工具到 Workflow 的一体化创作台</h2>
         <p>选择工具生成作品，沉淀为案例，再把可复用步骤编排成模板发布到市场。</p>
       </div>
@@ -3747,7 +3747,7 @@ function CreatePanel({
       <section className="create-main-panel">
         <div className="create-heading">
           <div>
-            <span className="eyebrow">Tool run</span>
+            <span className="eyebrow">工具运行</span>
             <h2>{selectedTool?.name}</h2>
             <p>{selectedTool?.description}</p>
           </div>
@@ -4146,7 +4146,7 @@ function WorksPanel({
           <>
             <div className="section-title-row">
               <div>
-                <span className="eyebrow">Work detail</span>
+              <span className="eyebrow">作品详情</span>
                 <h2>{workTitle(selectedWork)}</h2>
               </div>
               <span className="section-note">{workStatusLabel(selectedWork.status)}</span>
@@ -4161,8 +4161,8 @@ function WorksPanel({
               </div>
             ) : null}
             <div className="mini-meta">
-              <span>{selectedWork.toolKey || "tool"}</span>
-                <span>{selectedWork.modeKey || "默认模式"}</span>
+              <span>{selectedWork.toolKey || "创作工具"}</span>
+              <span>{selectedWork.modeKey || "默认模式"}</span>
               <span>{Number(selectedWork.likeCount || 0)} 收藏</span>
               <span>{selectedWork.galleryVisible ? "广场公开" : "私有"}</span>
               {selectedWork.isTrialOutput ? <span>试运行</span> : null}
@@ -5722,7 +5722,7 @@ function WorkflowCasePanel({
           <>
             <div className="section-title-row">
               <div>
-                <span className="eyebrow">Workflow Case</span>
+          <span className="eyebrow">Workflow 案例</span>
                 <h2>{selectedCase.title}</h2>
               </div>
               <span className="section-note">{selectedCase.licenseMode === "closed_paid" ? "闭源付费" : "开源免费"}</span>
@@ -6052,7 +6052,7 @@ function IncomePanel() {
       <div className="wide-panel income-policy-card">
         <div className="section-title-row">
           <div>
-            <span className="eyebrow">Creator income</span>
+            <span className="eyebrow">创作者收益</span>
             <h2>创作者平台内收益</h2>
           </div>
           <span className="section-note">{formatPoints(incomeSummary.availableCount)} 笔可用 · {formatPoints(incomeSummary.frozenCount)} 笔冻结</span>
@@ -6210,7 +6210,7 @@ function RunsPanel({ onToast }: { onToast: (toast: Toast) => void }) {
           <>
             <div className="section-title-row">
               <div>
-                <span className="eyebrow">Workflow run</span>
+                <span className="eyebrow">Workflow 运行</span>
                 <h2>{selectedRun.id.slice(-8)}</h2>
               </div>
               <div className="inline-actions">
