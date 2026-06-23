@@ -179,6 +179,7 @@ type ModelCapability = {
   latencyMs?: number;
   inputModalities?: string[];
   outputModalities?: string[];
+  status?: string;
 };
 
 type ComponentDefinition = {
@@ -841,7 +842,7 @@ function usePublicData() {
       settle(apiGet<Tool[]>("/tools")),
       settle(apiGet<PageData<CaseContent>>("/case-contents?pageSize=12")),
       settle(apiGet<PageData<Work>>("/gallery/works?pageSize=12")),
-      settle(apiGet<PageData<ModelCapability>>("/models?pageSize=12")),
+      settle(apiGet<PageData<ModelCapability>>("/models?pageSize=100")),
       settle(apiGet<PageData<ComponentDefinition>>("/components?pageSize=100&clientRuntime=h5-google")),
       settle(apiGet<CustomerServiceConfig>("/customer-service")),
       settle(apiGet<{ list: FaqItem[] }>("/faqs")),
@@ -3017,7 +3018,7 @@ function DashboardShell({
         {active === "create" ? <CreatePanel tools={tools} initialToolKey={routeToolKey} onToast={onToast} /> : null}
         {active === "works" ? <WorksPanel tools={tools} initialWorkId={routeWorkId} onToast={onToast} onOpenWorkflowCase={(caseId) => onNavigate("cases", workflowCasePath(caseId))} /> : null}
         {active === "showcase" ? <GalleryPanel tools={tools} authed onLogin={() => undefined} onToast={onToast} /> : null}
-        {active === "workflow" ? <WorkflowConsole components={components} tools={tools} workflowPolicy={appConfig?.workflowPolicy} initialWorkflowId={routeWorkflowId} initialRouteMode={routeWorkflowMode} onToast={onToast} /> : null}
+        {active === "workflow" ? <WorkflowConsole components={components} tools={tools} models={models} workflowPolicy={appConfig?.workflowPolicy} initialWorkflowId={routeWorkflowId} initialRouteMode={routeWorkflowMode} onToast={onToast} /> : null}
         {active === "cases" ? <WorkflowCasePanel initialCases={cases} onOpenPurchases={() => onNavigate("purchases")} onToast={onToast} /> : null}
         {active === "purchases" ? <PurchasedTemplates onToast={onToast} /> : null}
         {active === "income" ? <IncomePanel /> : null}
@@ -4072,6 +4073,38 @@ function resolveToolForComponent(component: ComponentDefinition, tools: Tool[]) 
   );
 }
 
+function configuredModelKeysForTool(tool?: Tool | null) {
+  if (!tool) return [];
+  const modes = enabledToolModes(tool);
+  const fromTool = Array.isArray(tool.options?.models) ? tool.options?.models : [];
+  const fromModes = modes.flatMap((mode) => {
+    const options = toolModeOptions(tool, mode);
+    return ([] as unknown[]).concat(mode.allowedModels || [], options.models || [], options.defaultModelKey || mode.defaultModelKey || []);
+  });
+  return unique(fromTool.concat(fromModes).map((item) => String(item || "").trim()));
+}
+
+function modelMatchesComponent(model: ModelCapability, component: ComponentDefinition) {
+  const kind = componentKind(component);
+  const modelText = `${model.modelKey || ""} ${model.name || ""} ${model.modality || ""} ${model.nodeType || ""} ${model.capabilityKey || ""}`.toLowerCase();
+  const outputs = (model.outputModalities || []).map((item) => String(item).toLowerCase());
+  if (kind === "image") return outputs.includes("image") || model.modality === "image" || /image|photo|picture|text_to_image/.test(modelText);
+  if (kind === "video") return outputs.includes("video") || model.modality === "video" || /video|text_to_video|image_to_video/.test(modelText);
+  if (kind === "audio") return outputs.includes("audio") || model.modality === "audio" || /audio|voice|music/.test(modelText);
+  return true;
+}
+
+function modelOptionsForNode(node: WorkflowEditorNode, tool: Tool | undefined, models: ModelCapability[]) {
+  const enabledModels = models.filter((model) => !model.status || ["online", "available", "enabled", "active"].includes(String(model.status).toLowerCase()));
+  const configuredKeys = configuredModelKeysForTool(tool);
+  if (configuredKeys.length) {
+    const configured = enabledModels.filter((model) => configuredKeys.includes(model.modelKey));
+    if (configured.length) return configured;
+  }
+  const matched = enabledModels.filter((model) => modelMatchesComponent(model, node.component));
+  return matched.length ? matched : enabledModels;
+}
+
 function editorNodeKey() {
   return `editor_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -4339,6 +4372,7 @@ function safeFileStem(value: string) {
 function WorkflowConsole({
   components,
   tools,
+  models,
   workflowPolicy,
   initialWorkflowId = "",
   initialRouteMode = "editor",
@@ -4346,6 +4380,7 @@ function WorkflowConsole({
 }: {
   components: ComponentDefinition[];
   tools: Tool[];
+  models: ModelCapability[];
   workflowPolicy?: WorkflowPublishPolicy;
   initialWorkflowId?: string;
   initialRouteMode?: "editor" | "run";
@@ -4357,6 +4392,7 @@ function WorkflowConsole({
   const [dragComponentKey, setDragComponentKey] = useState("");
   const [dragNodeKey, setDragNodeKey] = useState("");
   const [canvasDropActive, setCanvasDropActive] = useState(false);
+  const [canvasZoom, setCanvasZoom] = useState(1);
   const [draft, setDraft] = useState<WorkflowDraft | null>(null);
   const [title, setTitle] = useState("我的 seeFactory Workflow");
   const [summary, setSummary] = useState("把常用多步骤创作链路沉淀为可复用 Workflow。");
@@ -4405,6 +4441,30 @@ function WorkflowConsole({
   const activeNode = selectedNodes.find((node) => node.nodeKey === activeNodeKey) || selectedNodes[0] || null;
   const activeNodeIndex = activeNode ? selectedNodes.findIndex((node) => node.nodeKey === activeNode.nodeKey) : -1;
   const upstreamCandidates = activeNodeIndex > 0 ? selectedNodes.slice(0, activeNodeIndex) : [];
+  const activeTool = activeNode
+    ? activeNode.toolKey
+      ? tools.find((item) => item.toolKey === activeNode.toolKey) || resolveToolForComponent(activeNode.component, tools)
+      : resolveToolForComponent(activeNode.component, tools)
+    : undefined;
+  const activeModelOptions = activeNode ? modelOptionsForNode(activeNode, activeTool, models) : [];
+  const visualEdges = selectedNodes.flatMap((targetNode, targetIndex) => {
+    const sourceKeys = unique(targetNode.upstreamNodeKeys || []);
+    return sourceKeys
+      .map((sourceKey) => {
+        const sourceIndex = selectedNodes.findIndex((node) => node.nodeKey === sourceKey);
+        if (sourceIndex < 0 || sourceIndex >= targetIndex) return null;
+        const count = Math.max(1, selectedNodes.length);
+        return {
+          id: `${sourceKey}_${targetNode.nodeKey}`,
+          sourceIndex,
+          targetIndex,
+          sourceX: ((sourceIndex + 0.72) / count) * 100,
+          targetX: ((targetIndex + 0.28) / count) * 100,
+          rowOffset: Math.min(16, Math.abs(targetIndex - sourceIndex) * 3)
+        };
+      })
+      .filter(Boolean) as Array<{ id: string; sourceIndex: number; targetIndex: number; sourceX: number; targetX: number; rowOffset: number }>;
+  });
   const priceMinPoints = Math.max(1, Number(workflowPolicy?.priceMinPoints || 1));
   const priceMaxPoints = Number.isFinite(Number(workflowPolicy?.priceMaxPoints)) ? Math.max(priceMinPoints, Number(workflowPolicy?.priceMaxPoints)) : undefined;
   const trialLimitMaxPerUser = Math.max(0, Number(workflowPolicy?.trialLimitMaxPerUser ?? 0));
@@ -4442,6 +4502,35 @@ function WorkflowConsole({
 
   const updateNode = (nodeKey: string, patch: Partial<WorkflowEditorNode>) => {
     setSelectedNodes((current) => current.map((node) => node.nodeKey === nodeKey ? { ...node, ...patch } : node));
+    setValidation(null);
+  };
+
+  const duplicateNode = (nodeKey: string) => {
+    setSelectedNodes((current) => {
+      if (workflowNodeLimit && current.length >= workflowNodeLimit) {
+        onToast({ title: `当前发布策略最多允许 ${workflowNodeLimit} 个节点。`, tone: "info" });
+        return current;
+      }
+      const index = current.findIndex((node) => node.nodeKey === nodeKey);
+      if (index < 0) return current;
+      const source = current[index];
+      const copy = createEditorNode(source.component, {
+        upstreamNodeKeys: [source.nodeKey],
+        promptTemplate: source.promptTemplate,
+        toolKey: source.toolKey,
+        modelKey: source.modelKey,
+        costPoints: source.costPoints,
+        exposePrompt: source.exposePrompt,
+        exposeRatio: source.exposeRatio,
+        exposeResolution: source.exposeResolution,
+        exposeQuality: source.exposeQuality,
+        exposeUpload: source.exposeUpload
+      });
+      const next = [...current];
+      next.splice(index + 1, 0, copy);
+      setActiveNodeKey(copy.nodeKey);
+      return normalizeWorkflowNodeLinks(next);
+    });
     setValidation(null);
   };
 
@@ -4939,45 +5028,75 @@ function WorkflowConsole({
           onDrop={handleCanvasDrop}
         >
         {selectedNodes.length ? (
-          <div className="canvas-lanes">
-            {selectedNodes.map((node, index) => {
-              const component = node.component;
-              const tool = node.toolKey ? tools.find((item) => item.toolKey === node.toolKey) : resolveToolForComponent(component, tools);
-              const upstreamLabels = (node.upstreamNodeKeys || [])
-                .map((key) => selectedNodes.find((item) => item.nodeKey === key))
-                .filter(Boolean)
-                .map((item) => componentTitle((item as WorkflowEditorNode).component));
-              return (
-              <div
-                className={`lane ${activeNode?.nodeKey === node.nodeKey ? "selected" : ""} ${dragNodeKey === node.nodeKey ? "dragging" : ""}`}
-                key={node.nodeKey}
-                draggable
-                onClick={() => setActiveNodeKey(node.nodeKey)}
-                onDragStart={() => setDragNodeKey(node.nodeKey)}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={() => dropNodeOn(node.nodeKey)}
-                onDragEnd={() => setDragNodeKey("")}
-              >
-                <span>{componentCategoryLabel(component)} · {tool?.toolKey || "未映射工具"}</span>
-                <div className={index === 0 ? "flow-node active" : index === selectedNodes.length - 1 ? "flow-node accent" : "flow-node"}>
-                  {componentTitle(component)}
-                </div>
-                <small>{node.modelKey || component.modelKey || "使用工具默认模型"}</small>
-                <small>{upstreamLabels.length ? `输入来自：${upstreamLabels.join("、")}` : index === 0 ? "起始节点" : "未选择上游节点"}</small>
-                <div className="node-actions">
-                  <button className="node-remove" onClick={(event) => { event.stopPropagation(); moveNode(node.nodeKey, -1); }} disabled={index === 0}>
-                    上移
-                  </button>
-                  <button className="node-remove" onClick={(event) => { event.stopPropagation(); moveNode(node.nodeKey, 1); }} disabled={index === selectedNodes.length - 1}>
-                    下移
-                  </button>
-                  <button className="node-remove" onClick={(event) => { event.stopPropagation(); removeNode(node.nodeKey); }}>
-                    移除
-                  </button>
+          <div className="workflow-canvas-shell">
+            <div className="workflow-canvas-controls">
+              <button onClick={() => setCanvasZoom((value) => Math.max(0.7, Number((value - 0.1).toFixed(2))))}>缩小</button>
+              <span>{Math.round(canvasZoom * 100)}%</span>
+              <button onClick={() => setCanvasZoom((value) => Math.min(1.35, Number((value + 0.1).toFixed(2))))}>放大</button>
+              <button onClick={() => setCanvasZoom(1)}>适配</button>
+            </div>
+            <div className="workflow-canvas-viewport">
+              <div className="workflow-canvas-scale" style={{ transform: `scale(${canvasZoom})` }}>
+                <svg className="workflow-edge-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                  {visualEdges.map((edge) => {
+                    const midX = (edge.sourceX + edge.targetX) / 2;
+                    const sourceY = 44 - edge.rowOffset / 4;
+                    const targetY = 56 + edge.rowOffset / 4;
+                    return (
+                      <path
+                        key={edge.id}
+                        d={`M ${edge.sourceX} ${sourceY} C ${midX} ${sourceY}, ${midX} ${targetY}, ${edge.targetX} ${targetY}`}
+                      />
+                    );
+                  })}
+                </svg>
+                <div className="canvas-lanes" style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(selectedNodes.length, 1), 5)}, minmax(190px, 1fr))` }}>
+                  {selectedNodes.map((node, index) => {
+                    const component = node.component;
+                    const tool = node.toolKey ? tools.find((item) => item.toolKey === node.toolKey) : resolveToolForComponent(component, tools);
+                    const upstreamLabels = (node.upstreamNodeKeys || [])
+                      .map((key) => selectedNodes.find((item) => item.nodeKey === key))
+                      .filter(Boolean)
+                      .map((item) => componentTitle((item as WorkflowEditorNode).component));
+                    return (
+                    <div
+                      className={`lane ${activeNode?.nodeKey === node.nodeKey ? "selected" : ""} ${dragNodeKey === node.nodeKey ? "dragging" : ""}`}
+                      key={node.nodeKey}
+                      draggable
+                      onClick={() => setActiveNodeKey(node.nodeKey)}
+                      onDragStart={() => setDragNodeKey(node.nodeKey)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => dropNodeOn(node.nodeKey)}
+                      onDragEnd={() => setDragNodeKey("")}
+                    >
+                      <i className="node-port input" aria-hidden="true" />
+                      <i className="node-port output" aria-hidden="true" />
+                      <span>{componentCategoryLabel(component)} · {tool?.toolKey || "未映射工具"}</span>
+                      <div className={index === 0 ? "flow-node active" : index === selectedNodes.length - 1 ? "flow-node accent" : "flow-node"}>
+                        {componentTitle(component)}
+                      </div>
+                      <small>{node.modelKey || component.modelKey || "使用工具默认模型"}</small>
+                      <small>{upstreamLabels.length ? `输入来自：${upstreamLabels.join("、")}` : index === 0 ? "起始节点" : "未选择上游节点"}</small>
+                      <div className="node-actions">
+                        <button className="node-remove" onClick={(event) => { event.stopPropagation(); moveNode(node.nodeKey, -1); }} disabled={index === 0}>
+                          上移
+                        </button>
+                        <button className="node-remove" onClick={(event) => { event.stopPropagation(); moveNode(node.nodeKey, 1); }} disabled={index === selectedNodes.length - 1}>
+                          下移
+                        </button>
+                        <button className="node-remove" onClick={(event) => { event.stopPropagation(); duplicateNode(node.nodeKey); }}>
+                          复制
+                        </button>
+                        <button className="node-remove" onClick={(event) => { event.stopPropagation(); removeNode(node.nodeKey); }}>
+                          移除
+                        </button>
+                      </div>
+                    </div>
+                    );
+                  })}
                 </div>
               </div>
-              );
-            })}
+            </div>
           </div>
         ) : (
           <EmptyBlock title="画布等待组件配置" body="Dashboard 不会在前端硬编码节点，组件库需由后端 /components 下发。" />
@@ -5009,12 +5128,19 @@ function WorkflowConsole({
                 </select>
               </label>
               <label>
-                <span>模型 Key</span>
-                <input
+                <span>可用模型</span>
+                <select
                   value={activeNode.modelKey || ""}
                   onChange={(event) => updateNode(activeNode.nodeKey, { modelKey: event.target.value })}
-                  placeholder="为空时使用组件或工具默认模型"
-                />
+                >
+                  <option value="">跟随组件或工具默认模型</option>
+                  {activeModelOptions.map((model) => (
+                    <option value={model.modelKey} key={model.modelKey}>
+                      {model.name || model.modelKey} · {model.modality || model.nodeType || "model"} · {model.pricePoints || 0} 点
+                    </option>
+                  ))}
+                </select>
+                {!activeModelOptions.length ? <small>暂无可选模型，请先在 Admin 映射并上线平台模型。</small> : null}
               </label>
               <label>
                 <span>节点预估点数</span>
@@ -5664,6 +5790,7 @@ function RunsPanel({ onToast }: { onToast: (toast: Toast) => void }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const [busyWorkId, setBusyWorkId] = useState("");
+  const [runBusy, setRunBusy] = useState("");
 
   const loadRuns = () => {
     setLoading(true);
@@ -5726,6 +5853,21 @@ function RunsPanel({ onToast }: { onToast: (toast: Toast) => void }) {
       .finally(() => setBusyWorkId(""));
   };
 
+  const cancelRun = (run: WorkflowRun) => {
+    if (!["queued", "processing"].includes(String(run.status))) return;
+    setRunBusy(`cancel:${run.id}`);
+    apiPost<{ run: WorkflowRun; nodes: WorkflowRunNode[] }>(`/workflow-runs/${run.id}/cancel`, {}, { auth: true })
+      .then((data) => {
+        setSelectedRun(data.run);
+        setNodes(data.nodes || []);
+        setItems((current) => current.map((item) => item.id === run.id ? data.run : item));
+        onToast({ title: "Workflow 已取消，未消耗冻结点数会按后端规则释放。", tone: "success" });
+        loadRuns();
+      })
+      .catch((err) => onToast({ title: err.message || "取消 Workflow 失败", tone: "danger" }))
+      .finally(() => setRunBusy(""));
+  };
+
   if (loading) return <LoadingBlock title="正在同步运行记录" />;
   if (error) return <EmptyBlock title="运行记录暂不可用" body={error} />;
   if (!items.length) return <EmptyBlock title="暂无运行记录" body="运行工具或 Workflow 后会在这里看到状态、冻结点数和结算结果。" />;
@@ -5759,10 +5901,18 @@ function RunsPanel({ onToast }: { onToast: (toast: Toast) => void }) {
                 <span className="eyebrow">Workflow run</span>
                 <h2>{selectedRun.id.slice(-8)}</h2>
               </div>
-              <Button variant="ghost" onClick={() => openRun(selectedRun)} disabled={detailLoading}>
-                <Icon name="refresh" />
-                刷新
-              </Button>
+              <div className="inline-actions">
+                {["queued", "processing"].includes(String(selectedRun.status)) ? (
+                  <Button variant="ghost" onClick={() => cancelRun(selectedRun)} disabled={Boolean(runBusy)}>
+                    <Icon name="close" />
+                    {runBusy ? "取消中" : "取消运行"}
+                  </Button>
+                ) : null}
+                <Button variant="ghost" onClick={() => openRun(selectedRun)} disabled={detailLoading}>
+                  <Icon name="refresh" />
+                  刷新
+                </Button>
+              </div>
             </div>
             <div className="mini-meta">
               <span>{selectedRun.status}</span>
