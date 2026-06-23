@@ -563,10 +563,39 @@ code {
   gap: 14px;
 }
 
+.case-square-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.case-square-grid {
+  grid-template-columns: 1fr;
+}
+
 .case-card {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
   overflow: hidden;
+}
+
+.case-card:is(button) {
+  width: 100%;
+  border-color: var(--line);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.case-card:is(button):hover,
+.case-card:is(button).active {
+  transform: translateY(-1px);
+  border-color: rgba(98, 230, 209, 0.46);
+  background:
+    linear-gradient(135deg, rgba(98, 230, 209, 0.08), transparent 46%),
+    rgba(255, 255, 255, 0.045);
 }
 
 .case-card img {
@@ -588,6 +617,67 @@ code {
 
 .case-card > div {
   padding: 16px;
+}
+
+.case-square-detail {
+  position: sticky;
+  top: 92px;
+  display: grid;
+  gap: 14px;
+}
+
+.case-detail-preview {
+  display: grid;
+  min-height: 260px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(98, 230, 209, 0.14), transparent 36%),
+    rgba(255, 255, 255, 0.045);
+}
+
+.case-detail-preview img {
+  width: 100%;
+  height: 100%;
+  max-height: 360px;
+  object-fit: cover;
+}
+
+.case-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.case-detail-meta span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.78rem;
+}
+
+.case-type-filter button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+
+.case-type-filter button.active {
+  border-color: rgba(98, 230, 209, 0.46);
+  color: var(--text);
+  background: rgba(98, 230, 209, 0.12);
 }
 
 .public-gallery {
@@ -2615,6 +2705,7 @@ code {
   .workflow-console,
   .runs-layout,
   .case-action-layout,
+  .case-square-shell,
   .create-studio,
   .works-library,
   .gallery-layout,

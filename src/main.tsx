@@ -139,6 +139,8 @@ type CaseContent = {
   runCount?: number;
   trialRunCount?: number;
   cloneCount?: number;
+  favoriteCount?: number;
+  favorited?: boolean;
   prompt?: string;
   params?: Record<string, unknown>;
   runForm?: WorkflowRunForm;
@@ -579,9 +581,10 @@ type Toast = {
 };
 
 type PendingPublicAction = {
-  type: "gallery-download" | "gallery-rerun" | "share-download" | "share-rerun";
+  type: "gallery-download" | "gallery-rerun" | "share-download" | "share-rerun" | "case-rerun" | "case-download" | "case-favorite" | "case-workflow";
   workId?: string;
   ticket?: string;
+  caseId?: string;
 };
 
 type AuthResult = {
@@ -1372,7 +1375,16 @@ function clearAuthResult() {
 function isPendingPublicAction(value: unknown): value is PendingPublicAction {
   if (!value || typeof value !== "object") return false;
   const action = value as PendingPublicAction;
-  return ["gallery-download", "gallery-rerun", "share-download", "share-rerun"].includes(action.type);
+  return [
+    "gallery-download",
+    "gallery-rerun",
+    "share-download",
+    "share-rerun",
+    "case-rerun",
+    "case-download",
+    "case-favorite",
+    "case-workflow"
+  ].includes(action.type);
 }
 
 function readPendingPublicAction(): PendingPublicAction | null {
@@ -1824,7 +1836,336 @@ function caseContentTags(item: CaseContent) {
   return tags.filter(Boolean).slice(0, 3);
 }
 
-function CaseSquare({ cases }: { cases: CaseContent[] }) {
+type CaseContentFilter = "all" | "prompt" | "work" | "workflow";
+
+function CaseSquare({
+  cases,
+  authed,
+  onLogin,
+  onToast,
+  pendingAction,
+  onRequireAuthAction,
+  onActionConsumed,
+  onOpenDashboard
+}: {
+  cases: CaseContent[];
+  authed: boolean;
+  onLogin: () => void;
+  onToast: (toast: Toast) => void;
+  pendingAction?: PendingPublicAction | null;
+  onRequireAuthAction?: (action: PendingPublicAction) => void;
+  onActionConsumed?: () => void;
+  onOpenDashboard?: (tab: string, path?: string) => void;
+}) {
+  const [activeType, setActiveType] = useState<CaseContentFilter>("all");
+  const [items, setItems] = useState<CaseContent[]>(cases);
+  const [selectedCase, setSelectedCase] = useState<CaseContent | null>(cases[0] || null);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const pendingCaseActionRef = useRef("");
+  const filteredItems = activeType === "all" ? items : items.filter((item) => item.caseType === activeType);
+
+  const mergeCaseContent = (next: CaseContent) => {
+    setItems((current) => current.map((item) => (item.id === next.id ? { ...item, ...next } : item)));
+    setSelectedCase((current) => (current?.id === next.id ? { ...current, ...next } : current));
+  };
+
+  const loadCases = (nextType = activeType) => {
+    setLoading(true);
+    setError("");
+    const params = new URLSearchParams({ pageSize: "18" });
+    if (nextType !== "all") params.set("caseType", nextType);
+    apiGet<PageData<CaseContent>>(`/case-contents?${params.toString()}`, { auth: authed })
+      .then((data) => {
+        const list = data.list || [];
+        setItems(list);
+        setSelectedCase((current) => {
+          if (current && list.some((item) => item.id === current.id)) return list.find((item) => item.id === current.id) || current;
+          return list[0] || null;
+        });
+      })
+      .catch((err) => setError(err.message || "案例广场加载失败"))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (activeType === "all" && cases.length) {
+      setItems(cases);
+      setSelectedCase((current) => {
+        if (current && cases.some((item) => item.id === current.id)) return cases.find((item) => item.id === current.id) || current;
+        return cases[0] || null;
+      });
+      setLoading(false);
+      return;
+    }
+    loadCases(activeType);
+  }, [activeType, authed, cases.length]);
+
+  const openCase = (item: CaseContent) => {
+    setSelectedCase(item);
+    setBusy(`detail:${item.id}`);
+    apiGet<CaseContent>(`/case-contents/${item.id}`, { auth: authed })
+      .then((detail) => {
+        setSelectedCase(detail);
+        mergeCaseContent(detail);
+      })
+      .catch((err) => onToast({ title: err.message || "案例详情加载失败", tone: "danger" }))
+      .finally(() => setBusy(""));
+  };
+
+  const requireCaseAuth = (action: PendingPublicAction, message: string) => {
+    if (onRequireAuthAction) {
+      onRequireAuthAction(action);
+    } else {
+      onLogin();
+    }
+    onToast({ title: message, tone: "info" });
+  };
+
+  const copyCasePrompt = (item: CaseContent | null) => {
+    const prompt = String(item?.prompt || "").trim();
+    if (!prompt) {
+      onToast({ title: "该案例暂未公开提示词", tone: "danger" });
+      return;
+    }
+    navigator.clipboard?.writeText(prompt).catch(() => undefined);
+    onToast({ title: "提示词已复制", tone: "success" });
+  };
+
+  const caseGenerationSeed = async (item: CaseContent) => {
+    if (item.caseType === "prompt" && item.sourceId) {
+      return apiPost<{ toolKey?: string; prompt?: string; params?: Record<string, unknown> }>(`/prompt-cases/${item.sourceId}/use`, {}, { auth: true });
+    }
+    return {
+      toolKey: item.toolKey,
+      prompt: item.prompt,
+      params: item.params || {}
+    };
+  };
+
+  const openWorkflowCase = (item: CaseContent | null) => {
+    if (!item?.id) return;
+    if (!authed) {
+      requireCaseAuth({ type: "case-workflow", caseId: item.id }, "请先登录后再运行 Workflow 案例");
+      return;
+    }
+    onOpenDashboard?.("cases", `/dashboard/workflow-cases?id=${encodeURIComponent(item.id)}`);
+  };
+
+  const rerunCase = async (item: CaseContent | null) => {
+    if (!item?.id) return;
+    if (item.caseType === "workflow") {
+      openWorkflowCase(item);
+      return;
+    }
+    if (!authed) {
+      requireCaseAuth({ type: "case-rerun", caseId: item.id }, "请先登录后再同款创作");
+      return;
+    }
+    setBusy(`rerun:${item.id}`);
+    try {
+      const seed = await caseGenerationSeed(item);
+      if (!seed.toolKey || !seed.prompt) {
+        onToast({ title: "该案例缺少可复用的工具或提示词参数", tone: "danger" });
+        return;
+      }
+      const result = await apiPost<GenerationSubmitResult>("/generation-tasks", {
+        toolKey: seed.toolKey,
+        prompt: seed.prompt,
+        params: seed.params || {}
+      }, { auth: true });
+      onToast({ title: `同款生成任务已创建：${result.task.id.slice(-6)}`, tone: "success" });
+    } catch (err) {
+      onToast({ title: err instanceof Error ? err.message : "同款生成失败", tone: "danger" });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const downloadCaseWork = async (item: CaseContent | null) => {
+    if (!item?.id) return;
+    if (item.caseType !== "work" || !item.sourceId) {
+      onToast({ title: "只有公开作品案例支持下载", tone: "info" });
+      return;
+    }
+    if (!authed) {
+      requireCaseAuth({ type: "case-download", caseId: item.id }, "请先登录后再下载案例作品");
+      return;
+    }
+    setBusy(`download:${item.id}`);
+    try {
+      const data = await apiGet<DownloadUrl>(`/works/${item.sourceId}/download-url`, { auth: true });
+      if (data.url) {
+        openExternalUrl(data.url);
+        onToast({ title: data.signed ? "已生成临时下载链接" : "已打开下载链接", tone: "success" });
+      } else {
+        onToast({ title: "该作品暂未返回下载地址", tone: "danger" });
+      }
+    } catch (err) {
+      onToast({ title: err instanceof Error ? err.message : "下载失败", tone: "danger" });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const toggleFavoriteCase = async (item: CaseContent | null) => {
+    if (!item?.id) return;
+    if (!authed) {
+      requireCaseAuth({ type: "case-favorite", caseId: item.id }, "请先登录后再收藏案例");
+      return;
+    }
+    setBusy(`favorite:${item.id}`);
+    try {
+      const next = item.favorited
+        ? await apiDelete<CaseContent>(`/case-contents/${item.id}/favorite`, { auth: true })
+        : await apiPost<CaseContent>(`/case-contents/${item.id}/favorite`, {}, { auth: true });
+      mergeCaseContent(next);
+      onToast({ title: next.favorited ? "已收藏案例" : "已取消收藏", tone: "success" });
+    } catch (err) {
+      onToast({ title: err instanceof Error ? err.message : "收藏操作失败", tone: "danger" });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  useEffect(() => {
+    if (!authed || !pendingAction?.caseId || !pendingAction.type.startsWith("case-")) return;
+    const actionKey = `${pendingAction.type}:${pendingAction.caseId}`;
+    if (pendingCaseActionRef.current === actionKey) return;
+    pendingCaseActionRef.current = actionKey;
+    const runPending = async () => {
+      const cached = selectedCase?.id === pendingAction.caseId
+        ? selectedCase
+        : items.find((item) => item.id === pendingAction.caseId);
+      const target = cached || await apiGet<CaseContent>(`/case-contents/${pendingAction.caseId}`, { auth: true }).catch(() => null);
+      if (!target) return;
+      onActionConsumed?.();
+      if (pendingAction.type === "case-rerun") await rerunCase(target);
+      if (pendingAction.type === "case-download") await downloadCaseWork(target);
+      if (pendingAction.type === "case-favorite") await toggleFavoriteCase(target);
+      if (pendingAction.type === "case-workflow") openWorkflowCase(target);
+    };
+    runPending().catch(() => undefined);
+  }, [authed, pendingAction, selectedCase, items]);
+
+  return (
+    <section id="cases" className="content-band">
+      <div className="section-title-row">
+        <div>
+          <span className="eyebrow">CaseContent</span>
+          <h2>公开案例广场</h2>
+        </div>
+        <span className="section-note">提示词、公开作品和 Workflow 统一展示；收藏、下载、同款创作和运行权限均以后端配置为准</span>
+      </div>
+      <div className="gallery-filter-row case-type-filter">
+        {[
+          ["all", "全部"],
+          ["prompt", "提示词"],
+          ["work", "作品"],
+          ["workflow", "Workflow"]
+        ].map(([value, label]) => (
+          <button key={value} className={activeType === value ? "active" : ""} onClick={() => setActiveType(value as CaseContentFilter)}>
+            {label}
+          </button>
+        ))}
+        <button onClick={() => loadCases(activeType)} disabled={loading || Boolean(busy)}>
+          <Icon name="sync" />
+          {loading ? "同步中" : "刷新"}
+        </button>
+      </div>
+      {error ? <p className="danger-text">{error}</p> : null}
+      {loading ? (
+        <LoadingBlock title="正在同步案例广场" />
+      ) : filteredItems.length ? (
+        <div className="case-square-shell">
+          <div className="case-layout case-square-grid">
+            {filteredItems.map((item) => (
+              <button className={selectedCase?.id === item.id ? "case-card active" : "case-card"} key={item.id} onClick={() => openCase(item)}>
+                {item.coverUrl ? (
+                  <img src={item.coverUrl} alt={item.title} />
+                ) : (
+                  <div className="case-cover-placeholder">
+                    <Icon name="gallery" />
+                  </div>
+                )}
+                <div>
+                  <div className="card-topline">
+                    <span>{caseContentTypeLabel(item)}</span>
+                    <span>{caseContentAccessLabel(item)}</span>
+                    <span>{caseContentMetricLabel(item)}</span>
+                  </div>
+                  <h3>{item.title}</h3>
+                  <p>{item.summary || "该案例摘要尚未配置。"}</p>
+                  <div className="chip-row">
+                    {caseContentTags(item).map((tag) => (
+                      <span key={tag}>{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <article className="gallery-detail-panel case-square-detail">
+            {selectedCase ? (
+              <>
+                <div className="case-detail-preview">
+                  {selectedCase.coverUrl ? <img src={selectedCase.coverUrl} alt={selectedCase.title} /> : <Icon name="gallery" />}
+                </div>
+                <div className="card-topline">
+                  <span>{caseContentTypeLabel(selectedCase)}</span>
+                  <span>{caseContentAccessLabel(selectedCase)}</span>
+                  <span>{busy === `detail:${selectedCase.id}` ? "加载详情中" : caseContentMetricLabel(selectedCase)}</span>
+                </div>
+                <h3>{selectedCase.title}</h3>
+                <p>{selectedCase.summary || "该案例暂未填写摘要。"}</p>
+                <div className="case-detail-meta">
+                  <span>收藏 {formatPoints(selectedCase.favoriteCount || 0)}</span>
+                  <span>运行 {formatPoints(selectedCase.runCount || 0)}</span>
+                  {selectedCase.caseType === "workflow" ? <span>购买 {formatPoints(selectedCase.purchaseCount || 0)}</span> : null}
+                </div>
+                {selectedCase.prompt ? (
+                  <div className="copy-box">
+                    <span>{selectedCase.prompt}</span>
+                    <button onClick={() => copyCasePrompt(selectedCase)}>复制</button>
+                  </div>
+                ) : null}
+                {selectedCase.params && Object.keys(selectedCase.params).length ? (
+                  <details className="params-panel">
+                    <summary>公开参数</summary>
+                    <pre>{JSON.stringify(selectedCase.params || {}, null, 2)}</pre>
+                  </details>
+                ) : null}
+                <div className="case-action-buttons">
+                  <Button onClick={() => selectedCase.caseType === "workflow" ? openWorkflowCase(selectedCase) : rerunCase(selectedCase)} disabled={Boolean(busy)}>
+                    <Icon name={selectedCase.caseType === "workflow" ? "workflow" : "spark"} />
+                    {selectedCase.caseType === "workflow" ? "打开 Workflow" : "同款创作"}
+                  </Button>
+                  <Button variant="ghost" onClick={() => toggleFavoriteCase(selectedCase)} disabled={Boolean(busy)}>
+                    <Icon name="badge" />
+                    {selectedCase.favorited ? "取消收藏" : "收藏案例"}
+                  </Button>
+                  {selectedCase.caseType === "work" ? (
+                    <Button variant="ghost" onClick={() => downloadCaseWork(selectedCase)} disabled={Boolean(busy)}>
+                      <Icon name="download" />
+                      下载作品
+                    </Button>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <EmptyBlock title="请选择案例" body="从左侧案例列表中打开一个提示词、作品或 Workflow 案例。" />
+            )}
+          </article>
+        </div>
+      ) : (
+        <EmptyBlock title="暂无公开案例" body="请在 Dashboard 或 Admin 发布提示词、作品或 Workflow 案例后再展示。" />
+      )}
+    </section>
+  );
+}
+
+function StaticCaseSquare({ cases }: { cases: CaseContent[] }) {
   return (
     <section id="cases" className="content-band">
       <div className="section-title-row">
@@ -2424,7 +2765,8 @@ function PublicHome({
   onToast,
   pendingAction,
   onRequireAuthAction,
-  onActionConsumed
+  onActionConsumed,
+  onOpenDashboard
 }: {
   data: ReturnType<typeof usePublicData>;
   authed: boolean;
@@ -2434,6 +2776,7 @@ function PublicHome({
   pendingAction?: PendingPublicAction | null;
   onRequireAuthAction?: (action: PendingPublicAction) => void;
   onActionConsumed?: () => void;
+  onOpenDashboard?: (tab: string, path?: string) => void;
 }) {
   const scrollToShowcase = () => document.getElementById("showcase")?.scrollIntoView({ behavior: "smooth", block: "start" });
   const publicSection = publicSectionFromPath();
@@ -2450,7 +2793,16 @@ function PublicHome({
       {data.loading ? <LoadingBlock title="正在同步公开配置" /> : null}
       {data.error ? <EmptyBlock title="部分公开配置加载失败" body={data.error} /> : null}
       <ToolMatrix tools={data.tools} />
-      <CaseSquare cases={data.cases} />
+      <CaseSquare
+        cases={data.cases}
+        authed={authed}
+        onLogin={onLogin}
+        onToast={onToast}
+        pendingAction={pendingAction}
+        onRequireAuthAction={onRequireAuthAction}
+        onActionConsumed={onActionConsumed}
+        onOpenDashboard={onOpenDashboard}
+      />
       <GalleryPanel
         tools={data.tools}
         initialWorks={data.galleryWorks}
@@ -5985,18 +6337,18 @@ function App() {
     }
   };
 
-  const requestDashboard = (tab = dashboardTab) => {
+  const requestDashboard = (tab = dashboardTab, pathOverride = "") => {
     const nextTab = tab || "overview";
     setDashboardTab(nextTab);
     if (!authed) {
       setPendingDashboardTab(nextTab);
-      const path = dashboardPathForTab(nextTab);
+      const path = pathOverride || dashboardPathForTab(nextTab);
       setPendingDashboardPath(path);
       pushBrowserPath(path);
       setAuthOpen(true);
       return;
     }
-    openDashboard(nextTab);
+    openDashboard(nextTab, "push", pathOverride);
   };
 
   const rememberPublicAction = (action: PendingPublicAction) => {
@@ -6147,6 +6499,7 @@ function App() {
               pendingAction={pendingPublicAction}
               onRequireAuthAction={rememberPublicAction}
               onActionConsumed={consumePendingPublicAction}
+              onOpenDashboard={(tab, path) => requestDashboard(tab, path)}
             />
           )}
         </PublicShell>
