@@ -818,6 +818,8 @@ function resolveConfigAssetUrl(value?: string) {
 }
 
 const DASHBOARD_VISUAL_VERSION = "2026062501";
+const DEFAULT_HOME_VIDEO_URL = "/home-bg.mp4";
+const DEFAULT_HOME_POSTER_URL = "/home-bg-poster.jpg";
 
 function versionDashboardVisualAsset(url: string) {
   if (!url || !url.startsWith("/")) return url;
@@ -1774,8 +1776,8 @@ function PublicShell({
 }
 
 function HeroBackground({ home }: { home?: PublicAppConfig["home"] }) {
-  const videoUrl = resolveConfigAssetUrl(home?.videoUrl);
-  const posterUrl = versionDashboardVisualAsset(resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl));
+  const videoUrl = resolveConfigAssetUrl(home?.videoUrl) || DEFAULT_HOME_VIDEO_URL;
+  const posterUrl = versionDashboardVisualAsset(resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl) || DEFAULT_HOME_POSTER_URL);
   if (!videoUrl && !posterUrl) return null;
 
   return (
@@ -1844,8 +1846,8 @@ function Hero({
 }) {
   const home = appConfig?.home;
   const brandName = appConfig?.brand?.name?.trim() || "seeFactory";
-  const posterUrl = versionDashboardVisualAsset(resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl)) || dashboardVisuals.hero;
-  const videoUrl = resolveConfigAssetUrl(home?.videoUrl);
+  const posterUrl = versionDashboardVisualAsset(resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl) || DEFAULT_HOME_POSTER_URL) || dashboardVisuals.hero;
+  const videoUrl = resolveConfigAssetUrl(home?.videoUrl) || DEFAULT_HOME_VIDEO_URL;
   const imageTools = tools.filter((tool) => tool.category === "image");
   const videoTools = tools.filter((tool) => tool.category === "video");
   const featuredTool = tools[0];
