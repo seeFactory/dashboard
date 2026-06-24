@@ -1855,34 +1855,34 @@ const ACCESS_CHANNELS: AccessChannel[] = [
     key: "wechat",
     title: "微信小程序",
     label: "WeChat",
-    description: "使用微信扫码查看 seeFactory 小程序入口。正式小程序码上线后可直接替换这里的二维码。",
+    description: "使用微信扫码进入 seeFactory，适合在微信内快速查看作品与继续创作。",
     icon: "wechat",
-    actionLabel: "查看微信二维码",
+    actionLabel: "微信扫码进入",
     qrCodeUrl: "/qrcodes/wechat-miniapp.svg",
-    qrAlt: "seeFactory 微信小程序二维码",
-    qrCaption: "微信扫码"
+    qrAlt: "seeFactory 微信入口二维码",
+    qrCaption: "微信扫码进入"
   },
   {
     key: "alipay",
     title: "支付宝小程序",
     label: "Alipay",
-    description: "使用支付宝扫码查看 seeFactory 小程序入口。正式小程序码上线后可直接替换这里的二维码。",
+    description: "使用支付宝扫码进入 seeFactory，适合从支付宝内完成创作和支付。",
     icon: "alipay",
-    actionLabel: "查看支付宝二维码",
+    actionLabel: "支付宝扫码进入",
     qrCodeUrl: "/qrcodes/alipay-miniapp.svg",
-    qrAlt: "seeFactory 支付宝小程序二维码",
-    qrCaption: "支付宝扫码"
+    qrAlt: "seeFactory 支付宝入口二维码",
+    qrCaption: "支付宝扫码进入"
   },
   {
     key: "douyin",
     title: "抖音小程序",
     label: "Douyin",
-    description: "使用抖音扫码查看 seeFactory 小程序入口。正式小程序码上线后可直接替换这里的二维码。",
+    description: "使用抖音扫码进入 seeFactory，适合从内容灵感直接开始生成。",
     icon: "douyin",
-    actionLabel: "查看抖音二维码",
+    actionLabel: "抖音扫码进入",
     qrCodeUrl: "/qrcodes/douyin-miniapp.svg",
-    qrAlt: "seeFactory 抖音小程序二维码",
-    qrCaption: "抖音扫码"
+    qrAlt: "seeFactory 抖音入口二维码",
+    qrCaption: "抖音扫码进入"
   }
 ];
 
