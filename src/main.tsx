@@ -817,6 +817,14 @@ function resolveConfigAssetUrl(value?: string) {
   return `/${url.replace(/^\/+/, "")}`;
 }
 
+const DASHBOARD_VISUAL_VERSION = "2026062501";
+
+function versionDashboardVisualAsset(url: string) {
+  if (!url || !url.startsWith("/")) return url;
+  if (!url.startsWith("/visuals/") && url !== "/home-bg-poster.jpg") return url;
+  return `${url}${url.includes("?") ? "&" : "?"}v=${DASHBOARD_VISUAL_VERSION}`;
+}
+
 function clampConfigNumber(value: unknown, min: number, max: number, fallback: number) {
   const numeric = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(numeric)) return fallback;
@@ -1767,7 +1775,7 @@ function PublicShell({
 
 function HeroBackground({ home }: { home?: PublicAppConfig["home"] }) {
   const videoUrl = resolveConfigAssetUrl(home?.videoUrl);
-  const posterUrl = resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl);
+  const posterUrl = versionDashboardVisualAsset(resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl));
   if (!videoUrl && !posterUrl) return null;
 
   return (
@@ -1790,14 +1798,14 @@ function HeroBackground({ home }: { home?: PublicAppConfig["home"] }) {
 }
 
 const dashboardVisuals = {
-  hero: "/visuals/hero-control-room.jpg",
-  heroWide: "/visuals/hero-factory-wide.jpg",
-  image: "/visuals/image-studio.jpg",
-  video: "/visuals/video-timeline.jpg",
-  workflow: "/visuals/workflow-canvas.jpg",
-  gallery: "/visuals/gallery-wall.jpg",
-  model: "/visuals/model-lab.jpg",
-  market: "/visuals/workflow-market-wide.jpg"
+  hero: versionDashboardVisualAsset("/visuals/hero-control-room.jpg"),
+  heroWide: versionDashboardVisualAsset("/visuals/hero-factory-wide.jpg"),
+  image: versionDashboardVisualAsset("/visuals/image-studio.jpg"),
+  video: versionDashboardVisualAsset("/visuals/video-timeline.jpg"),
+  workflow: versionDashboardVisualAsset("/visuals/workflow-canvas.jpg"),
+  gallery: versionDashboardVisualAsset("/visuals/gallery-wall.jpg"),
+  model: versionDashboardVisualAsset("/visuals/model-lab.jpg"),
+  market: versionDashboardVisualAsset("/visuals/workflow-market-wide.jpg")
 };
 
 const homeVisualFallbacks = [
@@ -1836,7 +1844,7 @@ function Hero({
 }) {
   const home = appConfig?.home;
   const brandName = appConfig?.brand?.name?.trim() || "seeFactory";
-  const posterUrl = resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl) || dashboardVisuals.hero;
+  const posterUrl = versionDashboardVisualAsset(resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl)) || dashboardVisuals.hero;
   const videoUrl = resolveConfigAssetUrl(home?.videoUrl);
   const imageTools = tools.filter((tool) => tool.category === "image");
   const videoTools = tools.filter((tool) => tool.category === "video");
