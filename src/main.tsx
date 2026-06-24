@@ -1833,12 +1833,12 @@ type AccessChannel = {
 const ACCESS_CHANNELS: AccessChannel[] = [
   {
     key: "apk",
-    title: "App（APK）",
-    label: "Android 安装包",
-    description: "适合固定在手机桌面使用。安装包发布后会在这里开放下载。",
+    title: "App（Google Play）",
+    label: "Android App",
+    description: "前往 Google Play 获取 Android 版本，适合固定在手机桌面使用。",
     icon: "app",
-    actionLabel: "待开放下载",
-    disabled: true
+    actionLabel: "打开 Google Play",
+    href: "https://play.google.com/store/search?q=seeFactory&c=apps"
   },
   {
     key: "tma",
@@ -1890,10 +1890,7 @@ function PlatformAccessModal({
   if (!open) return null;
 
   const handleChannelAction = (channel: AccessChannel) => {
-    if (channel.disabled) {
-      onToast({ title: "APK 安装包发布后会在这里开放下载", tone: "info" });
-      return;
-    }
+    if (channel.disabled) return;
     if (channel.href) {
       openExternalUrl(channel.href);
       return;
