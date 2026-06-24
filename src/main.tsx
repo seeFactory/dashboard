@@ -1738,6 +1738,7 @@ function PublicShell({
 }) {
   return (
     <div className="site-shell runninghub-shell">
+      <HeroBackground home={appConfig?.home} />
       <div className="launch-strip">
         <span>Workflow 画布与模板市场已开放</span>
         <strong>工具、模板与作品广场会持续更新</strong>
