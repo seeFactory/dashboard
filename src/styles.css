@@ -232,8 +232,29 @@ code {
 .icon-mark[data-icon="wallet"]::before,
 .icon-mark[data-icon="badge"]::before,
 .icon-mark[data-icon="google"]::before,
-.icon-mark[data-icon="telegram"]::before {
+.icon-mark[data-icon="telegram"]::before,
+.icon-mark[data-icon="wechat"]::before,
+.icon-mark[data-icon="alipay"]::before,
+.icon-mark[data-icon="douyin"]::before {
   border-radius: 50%;
+}
+
+.icon-mark[data-icon="phone"]::before,
+.icon-mark[data-icon="app"]::before {
+  width: 10px;
+  height: 15px;
+  border-radius: 5px;
+}
+
+.icon-mark[data-icon="phone"]::after,
+.icon-mark[data-icon="app"]::after {
+  position: absolute;
+  bottom: 2px;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  content: "";
+  background: currentColor;
 }
 
 .icon-mark[data-icon="close"]::before {
@@ -2151,6 +2172,106 @@ code {
   text-align: center;
 }
 
+.platform-access-modal {
+  width: min(860px, 100%);
+  max-height: min(86vh, 760px);
+  overflow: auto;
+  border: var(--sf-glass-border);
+  border-radius: var(--sf-radius-xl);
+  background:
+    radial-gradient(circle at 18% 0, rgba(92, 231, 255, 0.16), transparent 32%),
+    radial-gradient(circle at 92% 16%, rgba(255, 53, 181, 0.12), transparent 30%),
+    rgba(5, 9, 19, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 28px 86px rgba(0, 0, 0, 0.46);
+  -webkit-backdrop-filter: blur(28px) saturate(1.22);
+  backdrop-filter: blur(28px) saturate(1.22);
+}
+
+.platform-access-intro {
+  max-width: 680px;
+  margin: 6px 0 20px;
+  color: var(--sf-muted);
+  line-height: 1.7;
+}
+
+.platform-access-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.platform-access-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  min-width: 0;
+  border: var(--sf-glass-border);
+  border-radius: 28px;
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.035)),
+    rgba(8, 13, 25, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13);
+}
+
+.platform-access-card:first-child {
+  grid-column: 1 / -1;
+}
+
+.platform-access-card.disabled {
+  opacity: 0.68;
+}
+
+.platform-access-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(92, 231, 255, 0.22);
+  border-radius: 18px;
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(92, 231, 255, 0.2), rgba(91, 124, 255, 0.14)),
+    rgba(255, 255, 255, 0.06);
+}
+
+.platform-access-card span {
+  color: var(--sf-soft);
+  font-size: 0.78rem;
+}
+
+.platform-access-card h3 {
+  margin: 2px 0 6px;
+  color: #fff;
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+
+.platform-access-card p {
+  margin: 0;
+  color: var(--sf-muted);
+  line-height: 1.62;
+}
+
+.platform-access-card button {
+  grid-column: 2;
+  justify-self: start;
+  min-height: 38px;
+  border: 1px solid rgba(92, 231, 255, 0.28);
+  border-radius: 999px;
+  padding: 0 14px;
+  color: #fff;
+  background: rgba(92, 231, 255, 0.1);
+  cursor: pointer;
+}
+
+.platform-access-card button:disabled {
+  cursor: not-allowed;
+  color: var(--sf-muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .google-button-host,
 .telegram-widget-host {
   display: grid;
@@ -3273,6 +3394,10 @@ body::before {
   justify-content: flex-end;
   gap: 12px;
   min-width: 0;
+}
+
+.topbar-actions .button {
+  min-width: max-content;
 }
 
 .search-fab {
@@ -6567,7 +6692,9 @@ body::before {
 
 .card-topline,
 .agreement-panel,
-.agreement-link-grid button {
+.agreement-link-grid button,
+.platform-access-card,
+.platform-access-card button {
   min-width: 0;
 }
 
@@ -6581,7 +6708,11 @@ body::before {
 .card-topline span,
 .card-topline small,
 .agreement-link-grid strong,
-.agreement-link-grid span {
+.agreement-link-grid span,
+.platform-access-card span,
+.platform-access-card h3,
+.platform-access-card p,
+.platform-access-card button {
   max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -6811,5 +6942,47 @@ body::before {
   .param-snapshot div {
     grid-template-columns: minmax(0, 1fr);
     gap: 4px;
+  }
+}
+
+@media (max-width: 760px) {
+  .topbar-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .topbar-actions .button {
+    width: 100%;
+    min-width: 0;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .platform-access-modal {
+    width: min(100%, 520px);
+    border-radius: 28px;
+    padding: 18px;
+  }
+
+  .platform-access-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .platform-access-card {
+    grid-template-columns: 42px minmax(0, 1fr);
+    border-radius: 24px;
+    padding: 16px;
+  }
+
+  .platform-access-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 16px;
+  }
+
+  .platform-access-card button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 }

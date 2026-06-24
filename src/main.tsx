@@ -1818,19 +1818,144 @@ function AuthModal({
   );
 }
 
+type AccessChannel = {
+  key: string;
+  title: string;
+  label: string;
+  description: string;
+  icon: string;
+  actionLabel: string;
+  href?: string;
+  copyKeyword?: string;
+  disabled?: boolean;
+};
+
+const ACCESS_CHANNELS: AccessChannel[] = [
+  {
+    key: "apk",
+    title: "App（APK）",
+    label: "Android 安装包",
+    description: "适合固定在手机桌面使用。安装包发布后会在这里开放下载。",
+    icon: "app",
+    actionLabel: "待开放下载",
+    disabled: true
+  },
+  {
+    key: "tma",
+    title: "Telegram Mini App",
+    label: "TMA",
+    description: "在 Telegram 内登录、查看点数、运行工具和模板。",
+    icon: "telegram",
+    actionLabel: "打开 TMA",
+    href: "https://tma.seefactory.xyz"
+  },
+  {
+    key: "wechat",
+    title: "微信小程序",
+    label: "WeChat",
+    description: "在微信中搜索 seeFactory，打开后可使用移动端创作入口。",
+    icon: "wechat",
+    actionLabel: "复制小程序名称",
+    copyKeyword: "seeFactory"
+  },
+  {
+    key: "alipay",
+    title: "支付宝小程序",
+    label: "Alipay",
+    description: "在支付宝中搜索 seeFactory，进入适配支付宝场景的小程序。",
+    icon: "alipay",
+    actionLabel: "复制小程序名称",
+    copyKeyword: "seeFactory"
+  },
+  {
+    key: "douyin",
+    title: "抖音小程序",
+    label: "Douyin",
+    description: "在抖音中搜索 seeFactory，适合从内容场景快速进入创作。",
+    icon: "douyin",
+    actionLabel: "复制小程序名称",
+    copyKeyword: "seeFactory"
+  }
+];
+
+function PlatformAccessModal({
+  open,
+  onClose,
+  onToast
+}: {
+  open: boolean;
+  onClose: () => void;
+  onToast: (toast: Toast) => void;
+}) {
+  if (!open) return null;
+
+  const handleChannelAction = (channel: AccessChannel) => {
+    if (channel.disabled) {
+      onToast({ title: "APK 安装包发布后会在这里开放下载", tone: "info" });
+      return;
+    }
+    if (channel.href) {
+      openExternalUrl(channel.href);
+      return;
+    }
+    if (channel.copyKeyword) {
+      navigator.clipboard?.writeText(channel.copyKeyword).catch(() => undefined);
+      onToast({ title: `已复制：${channel.copyKeyword}，请在${channel.title.replace("小程序", "")}中搜索打开`, tone: "success" });
+    }
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-panel platform-access-modal">
+        <div className="modal-head">
+          <div>
+            <span className="eyebrow">移动端入口</span>
+            <h2>选择访问方式</h2>
+          </div>
+          <button className="icon-button" onClick={onClose} aria-label="关闭">
+            <Icon name="close" />
+          </button>
+        </div>
+        <p className="platform-access-intro">根据你所在的平台打开 seeFactory。桌面端可以继续使用工作台，移动端更适合快速提交任务、查看作品和下载结果。</p>
+        <div className="platform-access-grid">
+          {ACCESS_CHANNELS.map((channel) => (
+            <article className={channel.disabled ? "platform-access-card disabled" : "platform-access-card"} key={channel.key}>
+              <div className="platform-access-icon">
+                <Icon name={channel.icon} />
+              </div>
+              <div>
+                <span>{channel.label}</span>
+                <h3>{channel.title}</h3>
+                <p>{channel.description}</p>
+              </div>
+              <button type="button" onClick={() => handleChannelAction(channel)} disabled={channel.disabled}>
+                {channel.actionLabel}
+              </button>
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PublicShell({
   appConfig,
   authed,
   onLogin,
   onOpenDashboard,
+  onToast,
   children
 }: {
   appConfig?: PublicAppConfig | null;
   authed: boolean;
   onLogin: () => void;
   onOpenDashboard: () => void;
+  onToast: (toast: Toast) => void;
   children: React.ReactNode;
 }) {
+  const [platformAccessOpen, setPlatformAccessOpen] = useState(false);
+
   return (
     <div className="site-shell runninghub-shell">
       <HeroBackground home={appConfig?.home} />
@@ -1850,6 +1975,10 @@ function PublicShell({
           <a href="#help">帮助</a>
         </nav>
         <div className="topbar-actions">
+          <Button variant="ghost" onClick={() => setPlatformAccessOpen(true)}>
+            <Icon name="phone" />
+            App / 小程序
+          </Button>
           <button type="button" className="search-fab" aria-label="搜索">
             <Icon name="search" />
           </button>
@@ -1867,6 +1996,7 @@ function PublicShell({
         </div>
       </header>
       {children}
+      <PlatformAccessModal open={platformAccessOpen} onClose={() => setPlatformAccessOpen(false)} onToast={onToast} />
     </div>
   );
 }
@@ -7771,7 +7901,7 @@ function App() {
           onToast={toastApi}
         />
       ) : (
-        <PublicShell appConfig={data.appConfig} authed={authed} onLogin={() => setAuthOpen(true)} onOpenDashboard={() => requestDashboard("overview")}>
+        <PublicShell appConfig={data.appConfig} authed={authed} onLogin={() => setAuthOpen(true)} onOpenDashboard={() => requestDashboard("overview")} onToast={toastApi}>
           {shareTicket ? (
             <ShareWorkPage
               ticket={shareTicket}
