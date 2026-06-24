@@ -4710,7 +4710,8 @@ body::before {
   filter: saturate(1.14) contrast(1.08) brightness(0.9);
 }
 
-.hero-tile-main > img {
+.hero-tile-main > img,
+.hero-tile-main > video {
   filter: saturate(1.08) contrast(1.04) brightness(1.04);
 }
 
