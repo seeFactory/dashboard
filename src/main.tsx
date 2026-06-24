@@ -3241,6 +3241,226 @@ function PublicHome({
   );
 }
 
+type DashboardNavItem = { key: string; label: string; icon: string };
+
+type DashboardCommandItem = {
+  id: string;
+  kind: string;
+  label: string;
+  description: string;
+  icon: string;
+  tab: string;
+  path?: string;
+  keywords: string;
+};
+
+function dashboardContext(active: string, counts: { tools: number; cases: number; models: number; components: number }) {
+  const contexts: Record<string, { title: string; body: string; stat: string }> = {
+    overview: { title: "总览当前创作能力", body: "先搜索工具或 Workflow，再进入创作、作品、钱包等高频入口。", stat: `${counts.tools} 工具 · ${counts.models} 模型` },
+    create: { title: "选择工具并开始生成", body: "先确认工具和模式，再填写提示词、比例、分辨率或素材输入。", stat: `${counts.tools} 个工具` },
+    works: { title: "管理生成资产", body: "筛选、下载、发布、再次生成和分享作品都在这里完成。", stat: "作品库" },
+    showcase: { title: "查看公开作品", body: "从公开作品复制提示词，或用同款参数重新创作。", stat: "广场" },
+    workflow: { title: "编排可复用流程", body: "拖入组件、绑定模型、预览运行表单，再发布为开源或闭源模板。", stat: `${counts.components} 组件` },
+    cases: { title: "浏览 Workflow 案例", body: "开源案例可克隆导出，闭源案例购买后获得永久运行权。", stat: `${counts.cases} 案例` },
+    purchases: { title: "运行已购模板", body: "已购买的闭源 Workflow 会沉淀在这里，后续运行只消耗模型节点点数。", stat: "已购" },
+    runs: { title: "追踪运行记录", body: "查看 Workflow 运行状态、节点结果、中间产物和失败原因。", stat: "运行" },
+    models: { title: "查看模型能力", body: "模型、比例、分辨率和精度能力以后端配置为准。", stat: `${counts.models} 模型` },
+    wallet: { title: "管理点数钱包", body: "桌面端使用 Crypto 充值，点数流水会记录生成、回退和收益。", stat: "点数" },
+    income: { title: "查看创作者收益", body: "模板购买收益会进入平台内收益余额，按规则冻结后可用。", stat: "收益" },
+    pricing: { title: "确认价格规则", body: "查看点数兑换、充值范围、支付说明和生成计费规则。", stat: "价格" },
+    help: { title: "获得帮助", body: "查看常见问题、客服渠道和已发布协议。", stat: "帮助" },
+    account: { title: "管理账户信息", body: "查看登录身份、账户状态、点数余额和协议入口。", stat: "账户" }
+  };
+  return contexts[active] || contexts.overview;
+}
+
+function dashboardActionItems(active: string): Array<{ label: string; icon: string; tab: string; path?: string }> {
+  const presets: Record<string, Array<{ label: string; icon: string; tab: string; path?: string }>> = {
+    overview: [
+      { label: "开始创作", icon: "image", tab: "create" },
+      { label: "打开作品库", icon: "gallery", tab: "works" },
+      { label: "编排 Workflow", icon: "nodes", tab: "workflow" }
+    ],
+    create: [
+      { label: "查看作品", icon: "gallery", tab: "works" },
+      { label: "模型能力", icon: "nodes", tab: "models" },
+      { label: "充值点数", icon: "wallet", tab: "wallet" }
+    ],
+    works: [
+      { label: "再次创作", icon: "image", tab: "create" },
+      { label: "公开广场", icon: "gallery", tab: "showcase" },
+      { label: "编排 Workflow", icon: "nodes", tab: "workflow" }
+    ],
+    workflow: [
+      { label: "案例市场", icon: "gallery", tab: "cases" },
+      { label: "已购模板", icon: "badge", tab: "purchases" },
+      { label: "运行记录", icon: "list", tab: "runs" }
+    ],
+    wallet: [
+      { label: "价格说明", icon: "wallet", tab: "pricing" },
+      { label: "开始创作", icon: "image", tab: "create" },
+      { label: "帮助中心", icon: "mail", tab: "help" }
+    ]
+  };
+  return presets[active] || [
+    { label: "开始创作", icon: "image", tab: "create" },
+    { label: "我的作品", icon: "gallery", tab: "works" },
+    { label: "Workflow", icon: "nodes", tab: "workflow" }
+  ];
+}
+
+function dashboardCommandItems({
+  nav,
+  tools,
+  cases,
+  models,
+  components
+}: {
+  nav: DashboardNavItem[];
+  tools: Tool[];
+  cases: CaseContent[];
+  models: ModelCapability[];
+  components: ComponentDefinition[];
+}) {
+  const navItems: DashboardCommandItem[] = nav.map((item) => ({
+    id: `nav:${item.key}`,
+    kind: "页面",
+    label: item.label,
+    description: "打开控制台页面",
+    icon: item.icon,
+    tab: item.key,
+    keywords: `${item.label} ${item.key}`
+  }));
+  const toolItems: DashboardCommandItem[] = tools.map((tool) => ({
+    id: `tool:${tool.toolKey}`,
+    kind: "工具",
+    label: tool.name,
+    description: tool.description || tool.category || "打开创作工具",
+    icon: tool.category === "video" || tool.outputTypes?.includes("video") ? "video" : "image",
+    tab: "create",
+    path: tool.toolKey ? "/dashboard/tool/" + encodeURIComponent(tool.toolKey) : dashboardPathForTab("create"),
+    keywords: `${tool.name} ${tool.toolKey} ${tool.category || ""} ${(tool.outputTypes || []).join(" ")} ${tool.description || ""}`
+  }));
+  const caseItems: DashboardCommandItem[] = cases.filter((item) => item.caseType === "workflow").map((item) => ({
+    id: `case:${item.id}`,
+    kind: "Workflow",
+    label: item.title,
+    description: item.summary || item.category || "打开 Workflow 案例",
+    icon: "nodes",
+    tab: "cases",
+    path: workflowCasePath(item.id),
+    keywords: `${item.title} ${item.summary || ""} ${item.category || ""} ${(item.tags || []).join(" ")} ${item.licenseMode || ""}`
+  }));
+  const modelItems: DashboardCommandItem[] = models.map((model) => ({
+    id: `model:${model.id}`,
+    kind: "模型",
+    label: model.name || model.modelKey,
+    description: `${model.modality || model.nodeType || "模型"} · ${model.status || "可用"}`,
+    icon: "nodes",
+    tab: "models",
+    keywords: `${model.name || ""} ${model.modelKey} ${model.modality} ${model.nodeType} ${model.capabilityKey}`
+  }));
+  const componentItems: DashboardCommandItem[] = components.map((component) => ({
+    id: `component:${component.id}`,
+    kind: "组件",
+    label: componentTitle(component),
+    description: component.description || componentCategoryLabel(component),
+    icon: "nodes",
+    tab: "workflow",
+    keywords: `${componentTitle(component)} ${component.componentKey} ${component.category || ""} ${component.modelKey || ""} ${component.description || ""}`
+  }));
+  return navItems.concat(toolItems, caseItems, modelItems, componentItems);
+}
+
+function DashboardCommandStrip({
+  active,
+  nav,
+  tools,
+  cases,
+  models,
+  components,
+  onNavigate
+}: {
+  active: string;
+  nav: DashboardNavItem[];
+  tools: Tool[];
+  cases: CaseContent[];
+  models: ModelCapability[];
+  components: ComponentDefinition[];
+  onNavigate: (tab: string, path?: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+  const counts = {
+    tools: tools.length,
+    cases: cases.filter((item) => item.caseType === "workflow").length,
+    models: models.length,
+    components: components.length
+  };
+  const context = dashboardContext(active, counts);
+  const allItems = dashboardCommandItems({ nav, tools, cases, models, components });
+  const normalizedQuery = query.trim().toLowerCase();
+  const results = (normalizedQuery
+    ? allItems.filter((item) => item.keywords.toLowerCase().includes(normalizedQuery) || item.label.toLowerCase().includes(normalizedQuery))
+    : allItems.filter((item) => item.tab === active || ["create", "works", "workflow"].includes(item.tab))
+  ).slice(0, 7);
+  const actions = dashboardActionItems(active);
+  const runItem = (item: DashboardCommandItem) => {
+    setQuery("");
+    setFocused(false);
+    onNavigate(item.tab, item.path);
+  };
+
+  return (
+    <section className="dashboard-command-strip">
+      <div className="dashboard-command-search">
+        <Icon name="search" />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => window.setTimeout(() => setFocused(false), 140)}
+          placeholder="搜索工具、Workflow、模型或页面"
+          aria-label="搜索控制台内容"
+        />
+        {query ? (
+          <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setQuery("")}>
+            清空
+          </button>
+        ) : null}
+        {focused ? (
+          <div className="dashboard-command-results">
+            {results.length ? results.map((item) => (
+              <button key={item.id} type="button" onMouseDown={(event) => { event.preventDefault(); runItem(item); }}>
+                <Icon name={item.icon} />
+                <span>
+                  <strong>{item.label}</strong>
+                  <small>{item.kind} · {item.description}</small>
+                </span>
+              </button>
+            )) : (
+              <div className="dashboard-command-empty">没有匹配结果，试试搜索工具名称、模型名称或 Workflow 标题。</div>
+            )}
+          </div>
+        ) : null}
+      </div>
+      <div className="dashboard-command-actions">
+        {actions.map((action) => (
+          <button key={`${action.tab}-${action.label}`} type="button" onClick={() => onNavigate(action.tab, action.path)}>
+            <Icon name={action.icon} />
+            {action.label}
+          </button>
+        ))}
+      </div>
+      <div className="dashboard-context-card">
+        <span>{context.stat}</span>
+        <strong>{context.title}</strong>
+        <small>{context.body}</small>
+      </div>
+    </section>
+  );
+}
+
 function DashboardShell({
   appConfig,
   tools,
@@ -3275,7 +3495,7 @@ function DashboardShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem(sidebarCollapsedKey) === "true");
   const navGroups: Array<{
     title: string;
-    items: Array<{ key: string; label: string; icon: string }>;
+    items: DashboardNavItem[];
   }> = [
     {
       title: "创作",
@@ -3367,11 +3587,20 @@ function DashboardShell({
             <span className="eyebrow">创作工作台</span>
             <h1>{title}</h1>
           </div>
-          <Button variant="primary" onClick={() => onToast({ title: "已创建空白 Workflow 草稿", tone: "success" })}>
+          <Button variant="primary" onClick={() => onNavigate("workflow")}>
             <Icon name="plus" />
             新建 Workflow
           </Button>
         </header>
+        <DashboardCommandStrip
+          active={active}
+          nav={nav}
+          tools={tools}
+          cases={cases}
+          models={models}
+          components={components}
+          onNavigate={onNavigate}
+        />
         {active === "overview" ? <Overview tools={tools} cases={cases} models={models} components={components} /> : null}
         {active === "create" ? <CreatePanel tools={tools} initialToolKey={routeToolKey} onToast={onToast} /> : null}
         {active === "works" ? <WorksPanel tools={tools} initialWorkId={routeWorkId} onToast={onToast} onOpenWorkflowCase={(caseId) => onNavigate("cases", workflowCasePath(caseId))} /> : null}

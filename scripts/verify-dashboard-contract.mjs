@@ -233,6 +233,19 @@ for (const pattern of [
 }
 
 for (const pattern of [
+  "function DashboardCommandStrip",
+  "function dashboardCommandItems",
+  "搜索工具、Workflow、模型或页面",
+  "onNavigate(item.tab, item.path)",
+  'path: tool.toolKey ? "/dashboard/tool/" + encodeURIComponent(tool.toolKey)',
+  "path: workflowCasePath(item.id)",
+  "function dashboardActionItems",
+  "function dashboardContext"
+]) {
+  includes(pattern, `Dashboard command search contract must include ${pattern}.`);
+}
+
+for (const pattern of [
   "function buildWorkflowGraph",
   "function buildWorkflowRunForm",
   "type WorkflowPublishPolicy",
@@ -556,6 +569,11 @@ for (const pattern of [
 }
 
 for (const pattern of [
+  ".dashboard-command-strip",
+  ".dashboard-command-search",
+  ".dashboard-command-results",
+  ".dashboard-command-actions",
+  ".dashboard-context-card",
   ".case-action-layout",
   ".case-action-list",
   ".case-action-detail",
