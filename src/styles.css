@@ -3368,9 +3368,9 @@ body::before {
 
 .tile-shade.heavy {
   background:
-    radial-gradient(circle at 50% 38%, rgba(186, 255, 0, 0.11), transparent 38%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.84)),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.1));
+    radial-gradient(circle at 50% 38%, rgba(186, 255, 0, 0.07), transparent 38%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.42)),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.24), rgba(0, 0, 0, 0.04));
 }
 
 .tile-copy {
@@ -4710,6 +4710,10 @@ body::before {
   filter: saturate(1.14) contrast(1.08) brightness(0.9);
 }
 
+.hero-tile-main > img {
+  filter: saturate(1.08) contrast(1.04) brightness(1.04);
+}
+
 .tile-shade {
   background:
     linear-gradient(180deg, rgba(2, 4, 10, 0.04) 12%, rgba(2, 4, 10, 0.88) 100%),
@@ -4718,10 +4722,10 @@ body::before {
 
 .tile-shade.heavy {
   background:
-    radial-gradient(circle at 52% 38%, rgba(105, 231, 255, 0.1), transparent 34%),
-    radial-gradient(circle at 78% 64%, rgba(255, 92, 184, 0.1), transparent 32%),
-    linear-gradient(180deg, rgba(2, 4, 10, 0.02), rgba(2, 4, 10, 0.62)),
-    linear-gradient(102deg, rgba(2, 4, 10, 0.44), rgba(2, 4, 10, 0.1) 46%, transparent 66%);
+    radial-gradient(circle at 52% 38%, rgba(105, 231, 255, 0.07), transparent 34%),
+    radial-gradient(circle at 78% 64%, rgba(255, 92, 184, 0.07), transparent 32%),
+    linear-gradient(180deg, rgba(2, 4, 10, 0), rgba(2, 4, 10, 0.36)),
+    linear-gradient(102deg, rgba(2, 4, 10, 0.22), rgba(2, 4, 10, 0.04) 46%, transparent 66%);
 }
 
 .tile-copy.bottom-left {

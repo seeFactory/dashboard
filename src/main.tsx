@@ -1844,8 +1844,6 @@ function Hero({
 }) {
   const home = appConfig?.home;
   const brandName = appConfig?.brand?.name?.trim() || "seeFactory";
-  const posterUrl = versionDashboardVisualAsset(resolveConfigAssetUrl(home?.posterUrl || home?.fallbackImageUrl)) || dashboardVisuals.hero;
-  const videoUrl = resolveConfigAssetUrl(home?.videoUrl);
   const imageTools = tools.filter((tool) => tool.category === "image");
   const videoTools = tools.filter((tool) => tool.category === "video");
   const featuredTool = tools[0];
@@ -1869,7 +1867,7 @@ function Hero({
       </div>
 
       <div className="hero-tile hero-tile-main">
-        {videoUrl ? <video src={videoUrl} poster={posterUrl} autoPlay muted loop playsInline preload="metadata" /> : <img src={dashboardVisuals.hero} alt="seeFactory Workflow" />}
+        <img src={dashboardVisuals.hero} alt="seeFactory AI 内容工厂" />
         <div className="tile-shade heavy" />
         <div className="tile-copy center-stage">
           <span>{home?.eyebrow?.trim() || "seeFactory 工作台"}</span>
