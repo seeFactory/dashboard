@@ -1826,7 +1826,9 @@ type AccessChannel = {
   icon: string;
   actionLabel: string;
   href?: string;
-  copyKeyword?: string;
+  qrCodeUrl?: string;
+  qrAlt?: string;
+  qrCaption?: string;
   disabled?: boolean;
 };
 
@@ -1842,39 +1844,45 @@ const ACCESS_CHANNELS: AccessChannel[] = [
   },
   {
     key: "tma",
-    title: "Telegram Mini App",
-    label: "TMA",
+    title: "Telegram Miniapp",
+    label: "Telegram Miniapp",
     description: "在 Telegram 内登录、查看点数、运行工具和模板。",
     icon: "telegram",
-    actionLabel: "打开 TMA",
+    actionLabel: "打开 Telegram Miniapp",
     href: "https://tma.seefactory.xyz"
   },
   {
     key: "wechat",
     title: "微信小程序",
     label: "WeChat",
-    description: "在微信中搜索 seeFactory，打开后可使用移动端创作入口。",
+    description: "使用微信扫码查看 seeFactory 小程序入口。正式小程序码上线后可直接替换这里的二维码。",
     icon: "wechat",
-    actionLabel: "复制小程序名称",
-    copyKeyword: "seeFactory"
+    actionLabel: "查看微信二维码",
+    qrCodeUrl: "/qrcodes/wechat-miniapp.svg",
+    qrAlt: "seeFactory 微信小程序二维码",
+    qrCaption: "微信扫码"
   },
   {
     key: "alipay",
     title: "支付宝小程序",
     label: "Alipay",
-    description: "在支付宝中搜索 seeFactory，进入适配支付宝场景的小程序。",
+    description: "使用支付宝扫码查看 seeFactory 小程序入口。正式小程序码上线后可直接替换这里的二维码。",
     icon: "alipay",
-    actionLabel: "复制小程序名称",
-    copyKeyword: "seeFactory"
+    actionLabel: "查看支付宝二维码",
+    qrCodeUrl: "/qrcodes/alipay-miniapp.svg",
+    qrAlt: "seeFactory 支付宝小程序二维码",
+    qrCaption: "支付宝扫码"
   },
   {
     key: "douyin",
     title: "抖音小程序",
     label: "Douyin",
-    description: "在抖音中搜索 seeFactory，适合从内容场景快速进入创作。",
+    description: "使用抖音扫码查看 seeFactory 小程序入口。正式小程序码上线后可直接替换这里的二维码。",
     icon: "douyin",
-    actionLabel: "复制小程序名称",
-    copyKeyword: "seeFactory"
+    actionLabel: "查看抖音二维码",
+    qrCodeUrl: "/qrcodes/douyin-miniapp.svg",
+    qrAlt: "seeFactory 抖音小程序二维码",
+    qrCaption: "抖音扫码"
   }
 ];
 
@@ -1895,9 +1903,8 @@ function PlatformAccessModal({
       openExternalUrl(channel.href);
       return;
     }
-    if (channel.copyKeyword) {
-      navigator.clipboard?.writeText(channel.copyKeyword).catch(() => undefined);
-      onToast({ title: `已复制：${channel.copyKeyword}，请在${channel.title.replace("小程序", "")}中搜索打开`, tone: "success" });
+    if (channel.qrCodeUrl) {
+      onToast({ title: `请使用${channel.qrCaption || channel.title}二维码打开`, tone: "info" });
     }
   };
 
@@ -1925,9 +1932,16 @@ function PlatformAccessModal({
                 <h3>{channel.title}</h3>
                 <p>{channel.description}</p>
               </div>
-              <button type="button" onClick={() => handleChannelAction(channel)} disabled={channel.disabled}>
-                {channel.actionLabel}
-              </button>
+              {channel.qrCodeUrl ? (
+                <div className="platform-access-qr">
+                  <img src={channel.qrCodeUrl} alt={channel.qrAlt || channel.title} loading="lazy" />
+                  <small>{channel.qrCaption || channel.actionLabel}</small>
+                </div>
+              ) : (
+                <button type="button" onClick={() => handleChannelAction(channel)} disabled={channel.disabled}>
+                  {channel.actionLabel}
+                </button>
+              )}
             </article>
           ))}
         </div>
@@ -2170,7 +2184,7 @@ function Hero({
           <small>适合快速提交图像、视频任务，查看作品进度和下载结果。</small>
         </a>
         <a className="platform-card" href="https://tma.seefactory.xyz" target="_blank" rel="noreferrer">
-          <span>Telegram Mini App</span>
+          <span>Telegram Miniapp</span>
           <strong>打开 Telegram 版本</strong>
           <small>在 Telegram 中快速进入工具、模板与点数账户。</small>
         </a>

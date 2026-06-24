@@ -2272,6 +2272,35 @@ code {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.platform-access-qr {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid rgba(190, 211, 230, 0.16);
+  border-radius: 22px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.platform-access-qr img {
+  width: 104px;
+  height: 104px;
+  border-radius: 16px;
+  padding: 8px;
+  object-fit: contain;
+  background: #fff;
+}
+
+.platform-access-qr small {
+  min-width: 0;
+  color: var(--sf-soft);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .google-button-host,
 .telegram-widget-host {
   display: grid;
@@ -6694,7 +6723,8 @@ body::before {
 .agreement-panel,
 .agreement-link-grid button,
 .platform-access-card,
-.platform-access-card button {
+.platform-access-card button,
+.platform-access-qr {
   min-width: 0;
 }
 
@@ -6712,7 +6742,8 @@ body::before {
 .platform-access-card span,
 .platform-access-card h3,
 .platform-access-card p,
-.platform-access-card button {
+.platform-access-card button,
+.platform-access-qr small {
   max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -6984,5 +7015,10 @@ body::before {
   .platform-access-card button {
     grid-column: 1 / -1;
     width: 100%;
+  }
+
+  .platform-access-qr {
+    grid-column: 1 / -1;
+    justify-content: center;
   }
 }
