@@ -4718,10 +4718,10 @@ body::before {
 
 .tile-shade.heavy {
   background:
-    radial-gradient(circle at 52% 38%, rgba(105, 231, 255, 0.16), transparent 34%),
-    radial-gradient(circle at 78% 64%, rgba(255, 92, 184, 0.16), transparent 32%),
-    linear-gradient(180deg, rgba(2, 4, 10, 0.04), rgba(2, 4, 10, 0.9)),
-    linear-gradient(102deg, rgba(2, 4, 10, 0.72), transparent 56%);
+    radial-gradient(circle at 52% 38%, rgba(105, 231, 255, 0.1), transparent 34%),
+    radial-gradient(circle at 78% 64%, rgba(255, 92, 184, 0.1), transparent 32%),
+    linear-gradient(180deg, rgba(2, 4, 10, 0.02), rgba(2, 4, 10, 0.62)),
+    linear-gradient(102deg, rgba(2, 4, 10, 0.44), rgba(2, 4, 10, 0.1) 46%, transparent 66%);
 }
 
 .tile-copy.bottom-left {
