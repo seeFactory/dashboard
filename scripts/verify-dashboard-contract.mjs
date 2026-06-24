@@ -412,7 +412,7 @@ for (const pattern of [
 }
 for (const pattern of [
   "作者未开放可调整运行参数",
-  "发布版本中锁定的默认配置"
+  "发布版本中锁定的默认设置"
 ]) {
   includes(pattern, `Dashboard empty workflow runForm notice must include ${pattern}.`);
 }

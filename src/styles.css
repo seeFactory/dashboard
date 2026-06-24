@@ -1536,6 +1536,46 @@ code {
   font-size: 0.78rem;
 }
 
+.param-snapshot {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.param-snapshot div {
+  display: grid;
+  grid-template-columns: minmax(82px, 0.34fr) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid rgba(154, 178, 212, 0.12);
+  border-radius: 18px;
+  padding: 10px 12px;
+  background: rgba(2, 7, 14, 0.22);
+}
+
+.param-snapshot dt,
+.param-snapshot dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.45;
+}
+
+.param-snapshot dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.param-snapshot dd {
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.param-empty {
+  margin: 10px 0 0;
+}
+
 .wallet-layout {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
@@ -6486,6 +6526,218 @@ body::before {
   border-radius: 26px;
 }
 
+/* Text safety pass for large rounded surfaces. */
+.launch-strip,
+.hero-campaign,
+.platform-card,
+.section-title-row,
+.dashboard-command-results button,
+.dashboard-command-actions button,
+.dashboard-context-card,
+.overview-list li,
+.overview-chip-cloud span,
+.metric-card,
+.overview-metric-card,
+.rh-tool-card,
+.case-deck-card,
+.gallery-preview-card,
+.model-strip article,
+.pricing-runway article,
+.case-action-list button,
+.workflow-entitlement-card,
+.workflow-publish-summary article,
+.workflow-runform-preview,
+.runform-chip-list span,
+.mini-meta span,
+.chip-row span,
+.asset-chip,
+.create-status-pill,
+.identity-card,
+.wallet-preview,
+.wallet-kv,
+.copy-box,
+.published-case,
+.create-tool-list button,
+.recent-work-list button,
+.works-grid button,
+.component-column button,
+.workflow-drafts button {
+  min-width: 0;
+}
+
+.card-topline,
+.agreement-panel,
+.agreement-link-grid button {
+  min-width: 0;
+}
+
+.card-topline {
+  align-items: flex-start;
+  gap: 10px 12px;
+  padding: 8px 10px;
+  line-height: 1.2;
+}
+
+.card-topline span,
+.card-topline small,
+.agreement-link-grid strong,
+.agreement-link-grid span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.agreement-panel {
+  padding: max(18px, min(24px, 5vw));
+}
+
+.agreement-link-grid {
+  gap: 12px;
+}
+
+.agreement-link-grid button {
+  min-height: 80px;
+  padding: 15px 16px;
+  line-height: 1.28;
+}
+
+.launch-strip span,
+.launch-strip strong,
+.platform-card strong,
+.platform-card small,
+.hero-campaign strong,
+.hero-campaign span,
+.dashboard-context-card strong,
+.dashboard-context-card small,
+.dashboard-command-results strong,
+.dashboard-command-results small,
+.overview-list strong,
+.overview-list small,
+.overview-list b,
+.overview-chip-cloud span,
+.case-action-list button strong,
+.case-action-list button small,
+.create-tool-list button strong,
+.create-tool-list button small,
+.recent-work-list button strong,
+.recent-work-list button small,
+.works-grid button > span,
+.component-column button strong,
+.component-column button small,
+.workflow-drafts button strong,
+.workflow-drafts button small,
+.published-case strong,
+.published-case small,
+.metric-card span,
+.metric-card strong,
+.overview-metric-card small,
+.workflow-publish-summary span,
+.workflow-publish-summary strong,
+.workflow-publish-summary small,
+.wallet-kv span,
+.wallet-kv strong,
+.identity-card strong,
+.identity-card p {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.launch-strip span,
+.launch-strip strong,
+.dashboard-command-results strong,
+.dashboard-command-results small,
+.overview-list strong,
+.overview-list small,
+.overview-list b,
+.case-action-list button strong,
+.case-action-list button small,
+.create-tool-list button strong,
+.create-tool-list button small,
+.component-column button strong,
+.component-column button small,
+.workflow-drafts button strong,
+.workflow-drafts button small,
+.published-case strong,
+.published-case small,
+.overview-chip-cloud span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.launch-strip {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.launch-strip span,
+.launch-strip strong {
+  line-height: 1.24;
+}
+
+.button,
+.launch-strip button,
+.hero-campaign button,
+.invite-card button,
+.hot-copy button,
+.case-deck-body button,
+.pricing-runway > button,
+.dashboard-command-actions button,
+.case-action-buttons .button,
+.wallet-actions .button {
+  min-width: 0;
+  min-height: 42px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.mini-meta span,
+.chip-row span,
+.runform-chip-list span,
+.overview-chip-cloud span,
+.featured-badge,
+.create-status-pill {
+  min-height: 34px;
+  padding: 8px 13px;
+  line-height: 1.2;
+}
+
+.section-title-row {
+  gap: 14px;
+}
+
+.section-title-row > div,
+.modal-head > div,
+.overview-list li > div,
+.published-case > div,
+.workflow-entitlement-card > div {
+  min-width: 0;
+}
+
+.section-title-row h2,
+.modal-head h2,
+.workflow-entitlement-card p,
+.workflow-lifecycle-note,
+.work-prompt-panel p,
+.params-panel pre,
+.param-snapshot dt,
+.param-snapshot dd {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.platform-card,
+.identity-card,
+.wallet-form,
+.wallet-order,
+.workflow-publish-summary article,
+.dashboard-context-card {
+  padding-inline: max(18px, min(24px, 6vw));
+}
+
 @media (max-width: 1180px) {
   .dashboard-command-strip,
   .create-studio,
@@ -6554,5 +6806,10 @@ body::before {
 
   .works-grid button {
     min-height: 220px;
+  }
+
+  .param-snapshot div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
   }
 }

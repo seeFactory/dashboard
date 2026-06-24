@@ -871,15 +871,15 @@ function usePublicData() {
         setFaqs(faqResult.ok ? faqResult.value.list || [] : []);
         setRechargePolicy(rechargeResult.ok ? rechargeResult.value : null);
         const errors = [
-          appConfigResult.ok ? "" : "公开配置：" + (appConfigResult.reason?.message || "加载失败"),
-          toolResult.ok ? "" : "工具配置：" + (toolResult.reason?.message || "加载失败"),
-          caseResult.ok ? "" : "案例配置：" + (caseResult.reason?.message || "加载失败"),
+          appConfigResult.ok ? "" : "首页内容：" + (appConfigResult.reason?.message || "加载失败"),
+          toolResult.ok ? "" : "工具内容：" + (toolResult.reason?.message || "加载失败"),
+          caseResult.ok ? "" : "案例内容：" + (caseResult.reason?.message || "加载失败"),
           galleryResult.ok ? "" : "作品广场：" + (galleryResult.reason?.message || "加载失败"),
           modelResult.ok ? "" : "模型能力：" + (modelResult.reason?.message || "加载失败"),
           componentResult.ok ? "" : "Workflow 组件：" + (componentResult.reason?.message || "加载失败"),
           customerResult.ok ? "" : "客服信息：" + (customerResult.reason?.message || "加载失败"),
           faqResult.ok ? "" : "FAQ：" + (faqResult.reason?.message || "加载失败"),
-          rechargeResult.ok ? "" : "充值配置：" + (rechargeResult.reason?.message || "加载失败")
+          rechargeResult.ok ? "" : "充值信息：" + (rechargeResult.reason?.message || "加载失败")
         ].filter(Boolean);
         setError(errors.join("；"));
       })
@@ -893,8 +893,8 @@ function usePublicData() {
 }
 
 function Logo({ appConfig }: { appConfig?: PublicAppConfig | null }) {
-  const brandName = appConfig?.brand?.name?.trim() || "seeFactory";
-  const subtitle = appConfig?.brand?.subtitle?.trim() || "AI 创作工厂";
+  const brandName = productCopy(appConfig?.brand?.name, "seeFactory");
+  const subtitle = productCopy(appConfig?.brand?.subtitle, "AI 创作工厂");
   const logoUrl = resolveLogoUrl(appConfig?.brand?.logoUrl);
   return (
     <div className="brand-lockup">
@@ -944,7 +944,7 @@ function LoadingBlock({ title }: { title: string }) {
     <div className="state-card">
       <span className="spinner" />
       <strong>{title}</strong>
-      <span>正在同步 seeFactory 的最新公开配置。</span>
+      <span>正在加载 seeFactory 的最新内容。</span>
     </div>
   );
 }
@@ -970,7 +970,7 @@ function WorkflowRunFormFields({
   if (!fields.length) {
     return (
       <div className="case-run-form">
-        <p className="muted-text">作者未开放可调整运行参数，将使用发布版本中锁定的默认配置。</p>
+        <p className="muted-text">作者未开放可调整运行参数，将使用发布版本中锁定的默认设置。</p>
       </div>
     );
   }
@@ -1130,6 +1130,101 @@ function formatPoints(value?: number) {
   const normalized = Number(value ?? 0);
   if (!Number.isFinite(normalized)) return "0";
   return new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 }).format(normalized);
+}
+
+const PARAM_LABELS: Record<string, string> = {
+  model: "模型",
+  modelKey: "模型",
+  providerModel: "上游模型",
+  prompt: "提示词",
+  negativePrompt: "反向提示词",
+  ratio: "比例",
+  aspectRatio: "比例",
+  resolution: "分辨率",
+  size: "尺寸",
+  quality: "精度",
+  duration: "时长",
+  style: "风格",
+  seed: "随机种子",
+  width: "宽度",
+  height: "高度",
+  count: "数量",
+  n: "数量",
+  steps: "步数",
+  strength: "参考强度",
+  cfgScale: "提示词权重",
+  guidanceScale: "引导强度",
+  outputType: "输出类型",
+  imageUrl: "参考图",
+  inputImage: "输入图片",
+  inputVideo: "输入视频"
+};
+
+function paramLabel(key: string) {
+  if (PARAM_LABELS[key]) return PARAM_LABELS[key];
+  return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (value) => value.toUpperCase());
+}
+
+function formatParamValue(value: unknown, depth = 0): string {
+  if (value === null || value === undefined || value === "") return "未填写";
+  if (typeof value === "boolean") return value ? "是" : "否";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "未填写";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    if (!value.length) return "未填写";
+    return value.map((item) => formatParamValue(item, depth + 1)).join("、");
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).filter(([, item]) => item !== undefined && item !== null && item !== "");
+    if (!entries.length) return "未填写";
+    if (depth > 0 || entries.length > 4) return `${entries.length} 项设置`;
+    return entries.map(([key, item]) => `${paramLabel(key)}：${formatParamValue(item, depth + 1)}`).join("；");
+  }
+  return String(value);
+}
+
+function ParamSnapshot({ params, emptyText = "暂无参数记录" }: { params?: Record<string, unknown>; emptyText?: string }) {
+  const entries = Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== "");
+  if (!entries.length) return <p className="muted-text param-empty">{emptyText}</p>;
+  return (
+    <dl className="param-snapshot">
+      {entries.map(([key, value]) => (
+        <div key={key}>
+          <dt>{paramLabel(key)}</dt>
+          <dd>{formatParamValue(value)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function productCopy(value?: unknown, fallback = "") {
+  const text = String(value ?? "").trim() || fallback;
+  return text
+    .replace(/\.seeflow\b/gi, "流程文件")
+    .replace(/\bgraph\b/gi, "流程图")
+    .replace(/\bopen_free\b/gi, "免费公开")
+    .replace(/\bclosed_paid\b/gi, "付费闭源")
+    .replace(/\bPC\s*H5\b/gi, "桌面 Web")
+    .replace(/进入 PC/g, "进入桌面")
+    .replace(/后端配置/g, "平台规则")
+    .replace(/后台配置/g, "平台规则")
+    .replace(/公开配置/g, "公开内容")
+    .replace(/工具配置/g, "工具内容")
+    .replace(/案例配置/g, "案例内容")
+    .replace(/充值配置/g, "充值信息");
+}
+
+function contentTypeLabel(value?: string) {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized.includes("video")) return "视频";
+  if (normalized.includes("image")) return "图像";
+  if (normalized.includes("audio")) return "音频";
+  if (normalized.includes("text")) return "文本";
+  return productCopy(value || "内容");
 }
 
 function workflowCanRun(item?: { canRun?: boolean; runnable?: boolean; status?: string; disabled?: boolean } | null) {
@@ -1677,7 +1772,7 @@ function AuthModal({
         <div className="modal-head">
           <div>
             <span className="eyebrow">登录 seeFactory</span>
-            <h2>选择 PC H5 登录方式</h2>
+            <h2>选择登录方式</h2>
           </div>
           <button className="icon-button" onClick={onClose} aria-label="关闭">
             <Icon name="close" />
@@ -1895,9 +1990,9 @@ function Hero({
         )}
         <div className="tile-shade heavy" />
         <div className="tile-copy center-stage">
-          <span>{home?.eyebrow?.trim() || "seeFactory 工作台"}</span>
-          <h1>{home?.headline?.trim() || "AI 内容工厂"}</h1>
-          <p>{home?.subtitle?.trim() || "在桌面端浏览工具、案例、模型和作品广场；登录后即可生成、下载、收藏、购买模板并编排 Workflow。"}</p>
+          <span>{productCopy(home?.eyebrow, "seeFactory 工作台")}</span>
+          <h1>{productCopy(home?.headline, "AI 内容工厂")}</h1>
+          <p>{productCopy(home?.subtitle, "在桌面端浏览工具、案例、模型和作品广场；登录后即可生成、下载、收藏、购买模板并编排 Workflow。")}</p>
           <div className="hero-actions">
             <Button onClick={onStart}>
               <Icon name="play" />
@@ -1939,7 +2034,7 @@ function Hero({
       <div className="platform-routes" aria-label="分端入口">
         <button type="button" className="platform-card primary" onClick={onStart}>
           <span>桌面 Web</span>
-          <strong>进入 PC 创作工作台</strong>
+          <strong>进入创作工作台</strong>
           <small>适合管理作品、编排 Workflow、购买模板和查看点数钱包。</small>
         </button>
         <a className="platform-card" href="https://app.seefactory.xyz" target="_blank" rel="noreferrer">
@@ -1950,7 +2045,7 @@ function Hero({
         <a className="platform-card" href="https://tma.seefactory.xyz" target="_blank" rel="noreferrer">
           <span>Telegram Mini App</span>
           <strong>打开 Telegram 版本</strong>
-          <small>适合在 Telegram 内登录、充值和运行工具。</small>
+          <small>在 Telegram 中快速进入工具、模板与点数账户。</small>
         </a>
       </div>
     </section>
@@ -1985,10 +2080,10 @@ function ToolMatrix({ tools }: { tools: Tool[] }) {
                 <span>{tool.cost || 0} 点/次</span>
               </div>
               <h3>{tool.name}</h3>
-              <p>{tool.description || "该工具正在补充说明，仍可进入工作台查看可用参数。"}</p>
+              <p>{productCopy(tool.description, "该工具正在补充说明，仍可进入工作台查看可用参数。")}</p>
               <div className="chip-row">
                 {(tool.fields || []).slice(0, 5).map((field) => (
-                  <span key={field}>{field}</span>
+                  <span key={field}>{paramLabel(field)}</span>
                 ))}
               </div>
             </article>
@@ -2101,7 +2196,7 @@ function HomeCaseDeck({
                   <span>{caseContentAccessLabel(item)}</span>
                 </div>
                 <h3>{item.title}</h3>
-                <p>{item.summary || "该案例摘要尚未配置。"}</p>
+                <p>{productCopy(item.summary, "该案例暂未填写摘要。")}</p>
                 <div className="chip-row">
                   {caseContentTags(item).map((tag) => <span key={tag}>{tag}</span>)}
                 </div>
@@ -2252,7 +2347,7 @@ function caseContentMetricLabel(item: CaseContent) {
 
 function caseContentTags(item: CaseContent) {
   const tags = item.tags?.length ? item.tags : [item.category || item.caseType || "case"];
-  return tags.filter(Boolean).slice(0, 3);
+  return tags.filter(Boolean).map((tag) => productCopy(tag)).slice(0, 3);
 }
 
 type CaseContentFilter = "all" | "prompt" | "work" | "workflow";
@@ -2515,7 +2610,7 @@ function CaseSquare({
                     <span>{caseContentMetricLabel(item)}</span>
                   </div>
                   <h3>{item.title}</h3>
-                  <p>{item.summary || "该案例摘要尚未配置。"}</p>
+                  <p>{productCopy(item.summary, "该案例暂未填写摘要。")}</p>
                   <div className="chip-row">
                     {caseContentTags(item).map((tag) => (
                       <span key={tag}>{tag}</span>
@@ -2537,7 +2632,7 @@ function CaseSquare({
                   <span>{busy === `detail:${selectedCase.id}` ? "加载详情中" : caseContentMetricLabel(selectedCase)}</span>
                 </div>
                 <h3>{selectedCase.title}</h3>
-                <p>{selectedCase.summary || "该案例暂未填写摘要。"}</p>
+                <p>{productCopy(selectedCase.summary, "该案例暂未填写摘要。")}</p>
                 <div className="case-detail-meta">
                   <span>收藏 {formatPoints(selectedCase.favoriteCount || 0)}</span>
                   <span>运行 {formatPoints(selectedCase.runCount || 0)}</span>
@@ -2552,7 +2647,7 @@ function CaseSquare({
                 {selectedCase.params && Object.keys(selectedCase.params).length ? (
                   <details className="params-panel">
                     <summary>公开参数</summary>
-                    <pre>{JSON.stringify(selectedCase.params || {}, null, 2)}</pre>
+                    <ParamSnapshot params={selectedCase.params} />
                   </details>
                 ) : null}
                 <div className="case-action-buttons">
@@ -2612,7 +2707,7 @@ function StaticCaseSquare({ cases }: { cases: CaseContent[] }) {
                   <span>{caseContentMetricLabel(item)}</span>
                 </div>
                 <h3>{item.title}</h3>
-                <p>{item.summary || "该案例摘要尚未配置。"}</p>
+                <p>{productCopy(item.summary, "该案例暂未填写摘要。")}</p>
                 <div className="chip-row">
                   {caseContentTags(item).map((tag) => (
                     <span key={tag}>{tag}</span>
@@ -2909,10 +3004,10 @@ function GalleryPanel({
                 <span>公开提示词</span>
                 <p>{selectedWork.prompt || "该作品暂未公开提示词。"}</p>
               </div>
-              {selectedWork.gallerySummary ? <p className="muted-text">{selectedWork.gallerySummary}</p> : null}
+              {selectedWork.gallerySummary ? <p className="muted-text">{productCopy(selectedWork.gallerySummary)}</p> : null}
               <details className="params-panel">
                 <summary>同款参数快照</summary>
-                <pre>{JSON.stringify(selectedWork.params || {}, null, 2)}</pre>
+                <ParamSnapshot params={selectedWork.params} />
               </details>
               <div className="case-action-buttons">
                 {workPreviewUrl(selectedWork) ? (
@@ -3007,7 +3102,7 @@ function SupportPanel({
   const copyValue = (label: string, value?: string) => {
     const text = String(value || "").trim();
     if (!text) {
-      onToast({ title: label + " 暂未配置", tone: "danger" });
+      onToast({ title: label + " 暂未提供", tone: "danger" });
       return;
     }
     navigator.clipboard?.writeText(text).catch(() => undefined);
@@ -3259,8 +3354,8 @@ function PublicHome({
   return (
     <>
       <Hero appConfig={data.appConfig} tools={data.tools} onStart={onStart} onShowcase={scrollToShowcase} />
-      {data.loading ? <LoadingBlock title="正在同步公开配置" /> : null}
-      {data.error ? <EmptyBlock title="部分公开配置加载失败" body={data.error} /> : null}
+      {data.loading ? <LoadingBlock title="正在加载创作内容" /> : null}
+      {data.error ? <EmptyBlock title="部分内容暂时不可用" body={data.error} /> : null}
       <HomeChannelStrip tools={data.tools} cases={data.cases} galleryWorks={data.galleryWorks} onStart={onStart} />
       <ToolMatrix tools={data.tools} />
       <HomeCaseDeck cases={data.cases} authed={authed} onLogin={onLogin} onToast={onToast} onOpenDashboard={onOpenDashboard} />
@@ -3295,7 +3390,7 @@ function dashboardContext(active: string, counts: { tools: number; cases: number
     cases: { title: "浏览 Workflow 案例", body: "开源案例可克隆导出，闭源案例购买后获得永久运行权。", stat: `${counts.cases} 案例` },
     purchases: { title: "运行已购模板", body: "已购买的闭源 Workflow 会沉淀在这里，后续运行只消耗模型节点点数。", stat: "已购" },
     runs: { title: "追踪运行记录", body: "查看 Workflow 运行状态、节点结果、中间产物和失败原因。", stat: "运行" },
-    models: { title: "查看模型能力", body: "模型、比例、分辨率和精度能力以后端配置为准。", stat: `${counts.models} 模型` },
+    models: { title: "查看模型能力", body: "可用模型、比例、分辨率和精度以实时能力为准。", stat: `${counts.models} 模型` },
     wallet: { title: "管理点数钱包", body: "桌面端使用 Crypto 充值，点数流水会记录生成、回退和收益。", stat: "点数" },
     income: { title: "查看创作者收益", body: "模板购买收益会进入平台内收益余额，按规则冻结后可用。", stat: "收益" },
     pricing: { title: "确认价格规则", body: "查看点数兑换、充值范围、支付说明和生成计费规则。", stat: "价格" },
@@ -3366,21 +3461,21 @@ function dashboardCommandItems({
     id: `tool:${tool.toolKey}`,
     kind: "工具",
     label: tool.name,
-    description: tool.description || tool.category || "打开创作工具",
+    description: productCopy(tool.description || tool.category, "打开创作工具"),
     icon: tool.category === "video" || tool.outputTypes?.includes("video") ? "video" : "image",
     tab: "create",
     path: tool.toolKey ? "/dashboard/tool/" + encodeURIComponent(tool.toolKey) : dashboardPathForTab("create"),
-    keywords: `${tool.name} ${tool.toolKey} ${tool.category || ""} ${(tool.outputTypes || []).join(" ")} ${tool.description || ""}`
+    keywords: `${tool.name} ${tool.toolKey} ${tool.category || ""} ${(tool.outputTypes || []).join(" ")} ${productCopy(tool.description || "")}`
   }));
   const caseItems: DashboardCommandItem[] = cases.filter((item) => item.caseType === "workflow").map((item) => ({
     id: `case:${item.id}`,
     kind: "Workflow",
     label: item.title,
-    description: item.summary || item.category || "打开 Workflow 案例",
+    description: productCopy(item.summary || item.category, "打开 Workflow 案例"),
     icon: "nodes",
     tab: "cases",
     path: workflowCasePath(item.id),
-    keywords: `${item.title} ${item.summary || ""} ${item.category || ""} ${(item.tags || []).join(" ")} ${item.licenseMode || ""}`
+    keywords: `${item.title} ${productCopy(item.summary || "")} ${productCopy(item.category || "")} ${(item.tags || []).map((tag) => productCopy(tag)).join(" ")} ${item.licenseMode || ""}`
   }));
   const modelItems: DashboardCommandItem[] = models.map((model) => ({
     id: `model:${model.id}`,
@@ -3395,10 +3490,10 @@ function dashboardCommandItems({
     id: `component:${component.id}`,
     kind: "组件",
     label: componentTitle(component),
-    description: component.description || componentCategoryLabel(component),
+    description: productCopy(component.description || componentCategoryLabel(component)),
     icon: "nodes",
     tab: "workflow",
-    keywords: `${componentTitle(component)} ${component.componentKey} ${component.category || ""} ${component.modelKey || ""} ${component.description || ""}`
+    keywords: `${componentTitle(component)} ${component.componentKey} ${component.category || ""} ${component.modelKey || ""} ${productCopy(component.description || "")}`
   }));
   return navItems.concat(toolItems, caseItems, modelItems, componentItems);
 }
@@ -3676,7 +3771,7 @@ function Overview({
         <div className="overview-hero-copy">
           <span className="eyebrow">seeFactory Console</span>
           <h2>从单次生成到可复用工作流的创作工作台</h2>
-          <p>这里展示当前账号可使用的工具、公开案例、模型能力与 Workflow 组件。所有入口均来自后端配置，生成参数和点数消耗以实时配置为准。</p>
+          <p>这里展示当前账号可使用的工具、公开案例、模型能力与 Workflow 组件。生成参数、点数消耗和可用能力会随平台规则实时更新。</p>
         </div>
         <div className="overview-hero-stack" aria-label="当前工作台状态">
           <span>{tools.length} 个创作工具</span>
@@ -3689,7 +3784,7 @@ function Overview({
         <div className="metric-card overview-metric-card">
           <span>可用工具</span>
           <strong>{tools.length}</strong>
-          <small>由管理后台控制显隐、排序和可用模型</small>
+          <small>可用状态、排序和模型范围会随平台规则更新</small>
         </div>
         <div className="metric-card overview-metric-card">
           <span>公开 Workflow</span>
@@ -3712,7 +3807,7 @@ function Overview({
         <article className="wide-panel overview-list-panel">
           <div className="card-topline">
             <span>创作入口</span>
-            <small>工具配置</small>
+            <small>可用工具</small>
           </div>
           <h3>当前可用工具</h3>
           <ul className="overview-list">
@@ -3721,11 +3816,11 @@ function Overview({
                 <Icon name={tool.category?.toLowerCase().includes("video") ? "video" : "image"} />
                 <div>
                   <strong>{tool.name}</strong>
-                  <small>{tool.description || tool.category || "后台配置的创作工具"}</small>
+                  <small>{productCopy(tool.description || tool.category, "可用于生成内容的创作工具")}</small>
                 </div>
-                <b>{typeof tool.cost === "number" ? `${tool.cost} 点` : "按配置计费"}</b>
+                <b>{typeof tool.cost === "number" ? `${tool.cost} 点` : "按规则计费"}</b>
               </li>
-            )) : <li className="overview-empty-line">后台启用创作工具后会显示在这里。</li>}
+            )) : <li className="overview-empty-line">可用创作工具上线后会显示在这里。</li>}
           </ul>
         </article>
 
@@ -3741,7 +3836,7 @@ function Overview({
                 <Icon name="nodes" />
                 <div>
                   <strong>{item.title}</strong>
-                  <small>{item.summary || item.category || "公开 Workflow 案例"}</small>
+                  <small>{productCopy(item.summary || item.category, "公开 Workflow 案例")}</small>
                 </div>
                 <b>{item.licenseMode === "closed_paid" ? `${item.pricePoints || 0} 点` : "免费"}</b>
               </li>
@@ -3758,7 +3853,7 @@ function Overview({
           <div className="overview-chip-cloud">
             {modelPreview.length ? modelPreview.map((model) => (
               <span key={model.id}>{model.name || model.modelKey}</span>
-            )) : <span>暂无模型配置</span>}
+            )) : <span>暂无可用模型</span>}
           </div>
         </article>
 
@@ -3771,7 +3866,7 @@ function Overview({
           <div className="overview-chip-cloud">
             {componentPreview.length ? componentPreview.map((component) => (
               <span key={component.id}>{component.displayName || component.label || component.componentKey}</span>
-            )) : <span>暂无组件配置</span>}
+            )) : <span>暂无可用组件</span>}
           </div>
         </article>
       </section>
@@ -4205,7 +4300,7 @@ function CreatePanel({
           <button key={tool.toolKey} className={selectedTool?.toolKey === tool.toolKey ? "active" : ""} onClick={() => changeTool(tool.toolKey)}>
             <Icon name={tool.category === "video" || tool.outputTypes?.includes("video") ? "video" : "image"} />
             <strong>{tool.name}</strong>
-            <small>{tool.cost || 0} 点 · {(tool.outputTypes || [tool.category || "image"]).join(", ")}</small>
+            <small>{tool.cost || 0} 点 · {(tool.outputTypes || [tool.category || "image"]).map(contentTypeLabel).join(" / ")}</small>
           </button>
         ))}
       </aside>
@@ -4215,7 +4310,7 @@ function CreatePanel({
           <div>
             <span className="eyebrow">工具运行</span>
             <h2>{selectedTool?.name}</h2>
-            <p>{selectedTool?.description}</p>
+            <p>{productCopy(selectedTool?.description, "该工具正在补充说明，仍可进入工作台查看可用参数。")}</p>
           </div>
           <div className="create-status-pill">
             <span>{selectedTool?.cost || 0} 点</span>
@@ -4663,7 +4758,7 @@ function WorksPanel({
             </div>
             <details className="params-panel">
               <summary>生成参数</summary>
-              <pre>{JSON.stringify(selectedWork.params || {}, null, 2)}</pre>
+              <ParamSnapshot params={selectedWork.params} />
             </details>
             {shareUrl ? (
               <div className="copy-box">
@@ -4981,7 +5076,7 @@ function validateWorkflowGraph(graph: WorkflowGraph, mode: "open_free" | "closed
       if (source === target) errors.push(`第 ${index + 1} 条连线不能连接节点自身。`);
     }
   });
-  if (graph.nodes.length > 1 && graph.edges.length === 0) warnings.push("当前 Workflow 没有连线，将按多个独立节点运行；如需顺序或合流，请在节点配置中选择上游节点。");
+  if (graph.nodes.length > 1 && graph.edges.length === 0) warnings.push("当前 Workflow 没有连线，将按多个独立节点运行；如需顺序或合流，请在节点设置中选择上游节点。");
   if (policy?.maxGraphNodes && graph.nodes.length > policy.maxGraphNodes) errors.push(`当前 Workflow 最多允许 ${policy.maxGraphNodes} 个节点。`);
   if (policy?.maxGraphModelNodes && executableNodes.length > policy.maxGraphModelNodes) errors.push(`当前 Workflow 最多允许 ${policy.maxGraphModelNodes} 个 AI 模型节点。`);
   const missingModels = graph.nodes.filter((node) => !String(node.modelKey || (node.config as any)?.modelKey || "").trim());
@@ -5497,7 +5592,7 @@ function WorkflowConsole({
       const target = draft || (await persistDraft());
       const manifest = await apiGet<Record<string, unknown>>(`/workflows/${target.id}/export`, { auth: true });
       downloadJsonFile(`${safeFileStem(target.title)}.seeflow`, manifest);
-      onToast({ title: "已导出 .seeflow 文件", tone: "success" });
+      onToast({ title: "流程文件已导出", tone: "success" });
     } catch (err) {
       onToast({ title: err instanceof Error ? err.message : "Workflow 导出失败", tone: "danger" });
     } finally {
@@ -5522,7 +5617,7 @@ function WorkflowConsole({
       loadWorkflows();
       onToast({ title: `已导入为私有草稿：${imported.title}`, tone: "success" });
     } catch (err) {
-      onToast({ title: err instanceof Error ? err.message : "请确认选择的是合法 .seeflow JSON 文件", tone: "danger" });
+      onToast({ title: err instanceof Error ? err.message : "请选择有效的流程文件", tone: "danger" });
     } finally {
       setBusy("");
       if (importInputRef.current) importInputRef.current.value = "";
@@ -5696,7 +5791,7 @@ function WorkflowConsole({
           />
           <Button variant="ghost" onClick={() => importInputRef.current?.click()} disabled={Boolean(busy)}>
             <Icon name="upload" />
-            导入 .seeflow
+            导入流程文件
           </Button>
           <Button variant="ghost" onClick={exportWorkflow} disabled={Boolean(busy) || !selectedNodes.length}>
             <Icon name="download" />
@@ -5766,7 +5861,7 @@ function WorkflowConsole({
           <article>
             <span>发布模式</span>
             <strong>{mode === "closed_paid" ? "闭源付费" : "开源免费"}</strong>
-            <small>{mode === "closed_paid" ? `售价 ${pricePoints} 点，购买后只开放运行权` : "公开流程图，允许克隆和导出 .seeflow"}</small>
+            <small>{mode === "closed_paid" ? `售价 ${pricePoints} 点，购买后开放运行权` : "开放流程图，可克隆或导出流程文件"}</small>
           </article>
           <article>
             <span>节点完整度</span>
@@ -5885,7 +5980,7 @@ function WorkflowConsole({
           <div className="node-config-panel">
             <div className="section-title-row">
               <div>
-                <span className="eyebrow">节点配置</span>
+                <span className="eyebrow">节点设置</span>
                 <h2>{componentTitle(activeNode.component)}</h2>
               </div>
               <span className="section-note">{componentCategoryLabel(activeNode.component)}</span>
@@ -6169,7 +6264,7 @@ function WorkflowCasePanel({
       </div>
     );
   }
-  if (!items.length) return <EmptyBlock title="暂无公开 Workflow 案例" body="发布 open_free 或 closed_paid Workflow 后会出现在这里。" />;
+  if (!items.length) return <EmptyBlock title="暂无公开 Workflow 案例" body="发布免费公开或付费闭源 Workflow 后会出现在这里。" />;
 
   return (
     <div className="case-action-layout workspace-section">
@@ -6193,7 +6288,7 @@ function WorkflowCasePanel({
               </div>
               <span className="section-note">{selectedCase.licenseMode === "closed_paid" ? "闭源付费" : "开源免费"}</span>
             </div>
-            <p>{selectedCase.summary || "该 Workflow 暂未填写摘要。"}</p>
+            <p>{productCopy(selectedCase.summary, "该 Workflow 暂未填写摘要。")}</p>
             <div className="mini-meta">
               <span>{selectedCase.pricePoints || 0} 点</span>
               <span>{status?.purchased ? "已购买" : selectedCase.purchaseRequired ? "需购买" : "免费运行"}</span>
@@ -6215,8 +6310,8 @@ function WorkflowCasePanel({
                   {selectedCase.licenseMode === "closed_paid"
                     ? status?.purchased
                       ? "你已获得该发布版本的永久运行权，历史试运行作品会自动解锁下载和发布；购买不包含流程图、克隆或导出权限。"
-                      : "购买后获得该发布版本的永久运行权；后续运行仍按模型节点扣点，不会开放流程图、克隆或 .seeflow 导出。"
-                    : "开源免费案例允许登录后运行、克隆为私有草稿，并导出公开 .seeflow。"}
+                      : "购买后获得该发布版本的永久运行权；后续运行仍按模型节点扣点，不会开放流程图、克隆或流程文件导出。"
+                    : "开源免费案例允许登录后运行、克隆为私有草稿，并导出公开流程文件。"}
                 </p>
                 {selectedLifecycleNote ? <p className="workflow-lifecycle-note">{selectedLifecycleNote}</p> : null}
               </div>
@@ -6263,7 +6358,7 @@ function WorkflowCasePanel({
                   </Button>
                   <Button variant="ghost" onClick={exportCase} disabled={Boolean(busy)}>
                     <Icon name="download" />
-                    导出 .seeflow
+                    导出流程文件
                   </Button>
                 </>
               ) : null}
@@ -6379,7 +6474,7 @@ function PurchasedTemplates({ onToast }: { onToast: (toast: Toast) => void }) {
               <span>{workflowCanRun(item) ? "可运行" : "暂停运行"}</span>
             </div>
             <h3>{item.case?.title || item.version?.title || "Workflow 模板"}</h3>
-            <p>{item.case?.summary || item.version?.summary || workflowBlockedReason(item) || "已购买的闭源模板，可继续调度运行。"}</p>
+            <p>{productCopy(item.case?.summary || item.version?.summary || workflowBlockedReason(item), "已购买的闭源模板，可继续调度运行。")}</p>
             <div className="mini-meta">
               <span>作者 {workflowPurchaseCreatorName(item)}</span>
               <span>{workflowPurchaseVersionLabel(item)}</span>
@@ -6816,7 +6911,7 @@ function WalletPanel({ onToast }: { onToast: (toast: Toast) => void }) {
         }
         const errors = [
           balanceResult.ok ? "" : `余额：${balanceResult.reason.message}`,
-          policyResult.ok ? "" : `充值配置：${policyResult.reason.message}`,
+          policyResult.ok ? "" : `充值信息：${policyResult.reason.message}`,
           optionsResult.ok ? "" : `支付路线：${optionsResult.reason.message}`,
           txResult.ok ? "" : `点数流水：${txResult.reason.message}`
         ].filter(Boolean);
@@ -6990,7 +7085,7 @@ function WalletPanel({ onToast }: { onToast: (toast: Toast) => void }) {
                     <button onClick={copyAddress}>复制</button>
                   </div>
                 ) : (
-                  <p className="danger-text">支付地址尚未返回，请同步订单或检查后台 Crypto 收单配置。</p>
+                  <p className="danger-text">支付地址尚未返回，请同步订单或联系支持确认收款信息。</p>
                 )}
                 <div className="wallet-actions">
                   <Button variant="ghost" onClick={() => syncCryptoOrder()} disabled={Boolean(busy)}>
@@ -7461,7 +7556,7 @@ function ShareWorkPage({
             </div>
             <details className="params-panel">
               <summary>参数快照</summary>
-              <pre>{JSON.stringify(work.params || {}, null, 2)}</pre>
+              <ParamSnapshot params={work.params} />
             </details>
             <div className="case-action-buttons">
               <Button variant="ghost" onClick={copySharedPrompt}>
