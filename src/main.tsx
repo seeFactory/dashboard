@@ -1873,20 +1873,25 @@ function Hero({
 
       <div className="hero-tile hero-tile-main">
         {videoUrl ? (
-          <video
-            src={videoUrl}
-            poster={posterUrl}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            onLoadedData={(event) => {
-              void event.currentTarget.play().catch(() => {});
-            }}
-          />
+          <>
+            <img className="hero-card-backdrop" src={dashboardVisuals.hero} alt="seeFactory AI 内容工厂" loading="eager" />
+            <video
+              className="hero-card-video-overlay"
+              src={videoUrl}
+              poster={posterUrl}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              aria-hidden="true"
+              onLoadedData={(event) => {
+                void event.currentTarget.play().catch(() => {});
+              }}
+            />
+          </>
         ) : (
-          <img src={posterUrl || dashboardVisuals.hero} alt="seeFactory AI 内容工厂" />
+          <img className="hero-card-backdrop" src={posterUrl || dashboardVisuals.hero} alt="seeFactory AI 内容工厂" />
         )}
         <div className="tile-shade heavy" />
         <div className="tile-copy center-stage">

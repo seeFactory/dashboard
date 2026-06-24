@@ -4715,6 +4715,46 @@ body::before {
   filter: saturate(1.08) contrast(1.04) brightness(1.04);
 }
 
+.hero-tile-main .hero-card-backdrop,
+.hero-tile-main .hero-card-video-overlay {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-tile-main .hero-card-backdrop {
+  z-index: 0;
+  transform: scale(1.01);
+  filter: saturate(1.18) contrast(1.07) brightness(1.06);
+}
+
+.hero-tile-main .hero-card-video-overlay {
+  z-index: 1;
+  opacity: 0.48;
+  mix-blend-mode: screen;
+  filter: saturate(1.18) contrast(1.04) brightness(1.08);
+}
+
+.hero-tile-main:hover .hero-card-backdrop {
+  transform: scale(1.035);
+}
+
+.hero-tile-main:hover .hero-card-video-overlay {
+  transform: scale(1.018);
+  opacity: 0.54;
+}
+
+.hero-tile-main .tile-shade.heavy {
+  z-index: 2;
+}
+
+.hero-tile-main .tile-copy {
+  z-index: 3;
+}
+
 .tile-shade {
   background:
     linear-gradient(180deg, rgba(2, 4, 10, 0.04) 12%, rgba(2, 4, 10, 0.88) 100%),
